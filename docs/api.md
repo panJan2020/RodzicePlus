@@ -301,26 +301,33 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "grupa": "macierzynski",         // ciaza | macierzynski | szczegolne
  "krotki_opis": "…", "dla_kogo": ["matka", "ojciec"], "przepisy": ["art. 31 ustawy zasiłkowej"]}
 
-// WynikSwiadczenia
+// WynikSwiadczenia – zasiłek macierzyński matki to DWA wyniki ze wspólnym ustaleniem prawa:
+// zasilek_macierzynski_urlop_macierzynski i zasilek_macierzynski_urlop_rodzicielski
 {"swiadczenie": "zasilek_macierzynski_urlop_macierzynski", "nazwa": "…",
- "osoba_id": "o1", "scenariusz_id": "s1",
+ "osoba_id": "o1", "scenariusz_id": "domyslny",
  "status": "warunkowo",           // przysluguje | warunkowo | brak_danych | nie_przysluguje
- "podsumowanie": "Przysługuje Ci zasiłek za 20 tygodni, o ile w dniu porodu nadal będziesz ubezpieczona.",
- "okres": {"od": "2026-12-30", "do": "2027-05-18", "tygodnie": 20},
- "kwota": {"miesieczna": "…", "za_okres": "…", "stawka": "1.00", "podstawa_wymiaru": "…",
-           "brutto": true},
- "kto_wyplaca": "zus",            // zus | platnik
- "kto_wyplaca_opis": "Zasiłek wypłaci ZUS (art. 61 ustawy zasiłkowej).",
- "gdzie_zlozyc": "ZUS (wniosek ZAM) – pracodawca przekaże Z-3",
- "uzasadnienie": ["Podlegasz ubezpieczeniu chorobowemu od 01.10.2024.", "…"],
- "powody": [],                    // przy nie_przysluguje: [{"pole": "...", "wartosc": "...", "komunikat": "..."}]
+                                  // warunkowo – poród jeszcze się nie odbył (nigdy automatyczna odmowa);
+                                  // nie_przysluguje – tylko po porodzie
+ "podsumowanie": "Przysługuje Ci zasiłek za 20 tygodni urlopu macierzyńskiego (od 10.03.2027 do 27.07.2027), o ile w dniu porodu nadal będziesz ubezpieczona – 7 075,78 zł miesięcznie brutto.",
+ "okres": {"od": "2027-03-10", "do": "2027-07-27", "tygodnie": 20},        // null przy nie_przysluguje / brak_danych
+ "kwota": {"miesieczna": "7075.78", "za_okres": "33020.40", "stawka": "1.00", "stawka_dzienna": "235.86",
+           "podstawa_wymiaru": "7075.78", "brutto": true},                  // null, gdy brakuje danych do kwoty
+ "kto_wyplaca": "platnik",        // zus | platnik | null (nie wiemy – C1 „nie wiem”; tekst w kto_wyplaca_opis)
+ "kto_wyplaca_opis": "Zasiłek wypłaci pracodawca – zgłasza do ubezpieczenia chorobowego ponad 20 osób (art. 61 ustawy zasiłkowej).",
+ "gdzie_zlozyc": "U pracodawcy: wniosek o zasiłek macierzyński (ZAM) złóż w kadrach.",
+ "uzasadnienie": ["W dniu 10.03.2027 podlegasz ubezpieczeniu chorobowemu."],
+ "powody": [],                    // przy nie_przysluguje (i warunkowo bez ubezpieczenia): [{"pole", "wartosc", "komunikat"}]
  "warunki": [{"opis": "Ubezpieczenie chorobowe w dniu porodu", "ryzyko": "brak_ubezpieczenia_w_dniu_porodu"}],
- "brakujace_pola": [],            // przy brak_danych: [{"pytanie_id": "B1", "tresc": "...", "gdzie_znalezc": "..."}]
- "co_zrobic": [],                 // przy nie_przysluguje / brak_danych: gotowe teksty
- "orientacyjny": true, "pola_do_potwierdzenia": ["miesiace"],
+ "brakujace_pola": [],            // braki do prawa (status brak_danych) ALBO do okresu / kwoty (status bez zmian):
+                                  // [{"pytanie_id": "B1", "tresc": "...", "gdzie_znalezc": "..."}]
+ "co_zrobic": [],                 // gotowe teksty
+ "orientacyjny": true,            // wynik z deklaracji, niepewnego odczytu AI albo trybu uproszczonego (O4s, Q1s)
+ "pola_do_potwierdzenia": [{"pytanie_id": "O4", "tresc": "Wynagrodzenie w kolejnych miesiącach",
+                            "gdzie_znalezc": "zaświadczenie Z-3, „Składniki wynagrodzenia”"}],
  "ryzyka": ["brak_ubezpieczenia_w_dniu_porodu"],
- "podstawa_prawna": ["art. 29 ustawy zasiłkowej"],
- "wersja_parametrow": "2026-10-24"}
+ "uwagi": ["Kwota orientacyjna – liczona ze średniego wynagrodzenia. …"],   // przybliżenia, założenia, „do potwierdzenia”
+ "podstawa_prawna": ["art. 29 ustawy zasiłkowej", "art. 31 ustawy zasiłkowej", "art. 180 Kodeksu pracy"],
+ "wersja_parametrow": "2026-01-01"}  // wersja obowiązująca w dniu powstania prawa
 ```
 
 ### 3.7. Scenariusze i kalkulator
@@ -337,15 +344,17 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
      {"osoba_id": "o2", "od": "2027-09-08", "tygodnie": 25, "praca_wymiar": "0.5"}],
    "urlop_ojcowski": [{"osoba_id": "o2", "od": "2027-01-10", "dni": 14}]}}
 
-// WynikKalkulatora
+// WynikKalkulatora (do etapu 4: tylko matka; okres zaczyna się w dniu powstania prawa, rodzicielski matki
+// bez 9 tygodni drugiego rodzica; bez daty porodu albo podstawy wymiaru – 422 z komunikatem)
 {"scenariusz_id": "s1", "wersja_parametrow": "2026-10-24",
  "osoby": [{"osoba_id": "o1", "podstawa_wymiaru": "7075.78", "suma": "…", "powrot_do_pracy": "2027-09-08"},
            {"osoba_id": "o2", "podstawa_wymiaru": "6500.00", "suma": "…", "powrot_do_pracy": "2028-02-01"}],
  "okresy": [{"rodzaj": "macierzynski", "osoba_id": "o1", "od": "2026-12-30", "do": "2027-05-18",
-             "tygodnie": 20, "stawka": "0.815", "kwota_miesieczna": "…", "kwota_za_okres": "…",
+             "tygodnie": 20, "stawka": "0.815", "stawka_dzienna": "…", "kwota_miesieczna": "…", "kwota_za_okres": "…",
              "praca_wymiar": null, "uwagi": []}],
  "suma": "…",
- "ostrzezenia": ["Każdemu z rodziców przysługuje 9 tygodni urlopu rodzicielskiego, których nie można przenieść."],
+ "orientacyjny": true,            // podstawa z trybu uproszczonego (O4s, Q1s)
+ "ostrzezenia": ["9 tygodni urlopu rodzicielskiego przysługuje wyłącznie drugiemu rodzicowi – zasiłek za nie zawsze wynosi 70%."],
  "bledy_wyborow": []}             // np. przekroczona pula, więcej niż 5 części
 
 // Porównanie scenariuszy – GET /sprawy/{id}/kalkulator/porownanie

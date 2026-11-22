@@ -281,6 +281,12 @@ def fakty(sprawa: Sprawa, osoba: Osoba) -> dict[str, Any]:
     return {k: v for k, v in merge.aktywne_wartosci(osoba).items() if k not in nieaktywne}
 
 
+def fakty_z_pochodzeniem(sprawa: Sprawa, osoba: Osoba) -> tuple[dict[str, Any], dict[str, WartoscPola]]:
+    """Jak `fakty`, a do tego aktywne WartoscPola tych pól (skąd wartość – do „wyniku orientacyjnego”)."""
+    f = fakty(sprawa, osoba)
+    return f, {pole: w for pole in f if (w := osoba.aktywna(pole)) is not None}
+
+
 def pytania_do_uzupelnienia(sprawa: Sprawa, osoba: Osoba, pola: list[str]) -> list[str]:
     """Zamienia nazwy brakujących pól na ID pytań, na które użytkownik może odpowiedzieć teraz.
 

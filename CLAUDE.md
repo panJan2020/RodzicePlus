@@ -145,7 +145,8 @@ Backend – Python FastAPI                                          ▼
 3. **Żadnych „magicznych liczb” z przepisów w kodzie** (20, 41, 0.815, 4806, 13.71…). Tylko `p["..."]` z parametrów.
 4. **Logika prawna tylko w backendzie.** Flutter niczego nie liczy, tylko wyświetla wyniki z API.
 5. **LLM nie decyduje o prawie do świadczenia i nie liczy kwot.**
-6. Kwoty w backendzie w `Decimal`, zaokrąglenie do groszy na końcu. W API kwoty jako **tekst** (`"1234.56"`).
+6. Kwoty w backendzie w `Decimal`; zaokrąglenia do groszy w miejscach, w których robi to ZUS (podstawa wymiaru,
+   stawka dzienna) – nigdzie indziej. W API kwoty jako **tekst** (`"1234.56"`).
 7. Każda nowa reguła prawna = test w `backend/tests/` z numerem artykułu w nazwie, np. `test_urlop_macierzynski_art180`.
 8. Nazwy pól = kolumna „Pole” w `docs/pytania_kalkulator.md`. Nowe pole dopisz do `questions/katalog.json`.
 9. Zmiana kształtu API = w tym samym commicie aktualizacja `docs/api.md` **i** `frontend/lib/data/models/modele.dart`.

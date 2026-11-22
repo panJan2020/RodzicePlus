@@ -1,7 +1,7 @@
 """Wyniki zwracane przez API świadczeń i kalkulatora (docs/api.md 3.6–3.7).
 
-Kod zwraca PODZBIÓR pól z kontraktu – pola, których jeszcze nie liczymy (np. okres i kwota w wyniku świadczenia,
-scenariusze), dochodzą razem z regułami. Kwoty i stawki zawsze jako tekst ("1234.56", "0.815").
+Kwoty i stawki zawsze jako tekst ("1234.56", "0.815"). Pola, których jeszcze nie liczymy (scenariusze,
+drugi rodzic), dochodzą razem z regułami.
 """
 from datetime import date
 from enum import Enum
@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 
 class Status(str, Enum):
     PRZYSLUGUJE = "przysluguje"
-    NIE_PRZYSLUGUJE = "nie_przysluguje"
+    WARUNKOWO = "warunkowo"          # spełnione, ale zależne od przyszłego zdarzenia (np. ubezpieczenie w dniu porodu)
     BRAK_DANYCH = "brak_danych"
+    NIE_PRZYSLUGUJE = "nie_przysluguje"
 
 
 class BrakujacePole(BaseModel):
@@ -27,16 +28,48 @@ class Powod(BaseModel):
     komunikat: str
 
 
+class Warunek(BaseModel):
+    """Warunek wyniku `warunkowo` – przyszłe zdarzenie, od którego zależy prawo."""
+    opis: str
+    ryzyko: str | None = None        # kod ryzyka (content/ryzyka), np. "brak_ubezpieczenia_w_dniu_porodu"
+
+
+class OkresWyniku(BaseModel):
+    od: date
+    do: date
+    tygodnie: int
+
+
+class KwotaWyniku(BaseModel):
+    miesieczna: str
+    za_okres: str
+    stawka: str
+    stawka_dzienna: str
+    podstawa_wymiaru: str
+    brutto: bool = True
+
+
 class WynikSwiadczenia(BaseModel):
-    swiadczenie: str                 # np. "zasilek_macierzynski"
+    swiadczenie: str                 # np. "zasilek_macierzynski_urlop_macierzynski"
     nazwa: str
     osoba_id: str
+    scenariusz_id: str
     status: Status
+    podsumowanie: str                # jedno zdanie dla użytkownika
+    okres: OkresWyniku | None = None
+    kwota: KwotaWyniku | None = None # None – nie da się jeszcze policzyć (braki w `brakujace_pola`)
+    kto_wyplaca: str | None = None   # "platnik" | "zus" | None (nie wiemy – patrz kto_wyplaca_opis)
+    kto_wyplaca_opis: str | None = None
+    gdzie_zlozyc: str | None = None
     uzasadnienie: list[str] = Field(default_factory=list)   # zdania dla użytkownika
     powody: list[Powod] = Field(default_factory=list)        # przy nie_przysluguje
-    brakujace_pola: list[BrakujacePole] = Field(default_factory=list)  # przy brak_danych
-    kto_wyplaca: str | None = None   # "platnik" | "zus"
-    kto_wyplaca_opis: str | None = None
+    warunki: list[Warunek] = Field(default_factory=list)     # przy warunkowo
+    brakujace_pola: list[BrakujacePole] = Field(default_factory=list)  # braki do prawa, okresu albo kwoty
+    co_zrobic: list[str] = Field(default_factory=list)
+    orientacyjny: bool = False
+    pola_do_potwierdzenia: list[BrakujacePole] = Field(default_factory=list)
+    ryzyka: list[str] = Field(default_factory=list)          # kody ryzyk
+    uwagi: list[str] = Field(default_factory=list)           # przybliżenia, założenia, „do potwierdzenia”
     podstawa_prawna: list[str] = Field(default_factory=list)
     wersja_parametrow: str
 
@@ -48,6 +81,7 @@ class OkresKalkulatora(BaseModel):
     do: date
     tygodnie: int
     stawka: str
+    stawka_dzienna: str
     kwota_miesieczna: str
     kwota_za_okres: str
     uwagi: list[str] = Field(default_factory=list)
@@ -57,6 +91,7 @@ class OsobaKalkulatora(BaseModel):
     osoba_id: str
     podstawa_wymiaru: str
     suma: str
+    powrot_do_pracy: date
 
 
 class WynikKalkulatora(BaseModel):
@@ -65,5 +100,6 @@ class WynikKalkulatora(BaseModel):
     osoby: list[OsobaKalkulatora]
     okresy: list[OkresKalkulatora]
     suma: str
+    orientacyjny: bool = False
     ostrzezenia: list[str] = Field(default_factory=list)
     bledy_wyborow: list[str] = Field(default_factory=list)

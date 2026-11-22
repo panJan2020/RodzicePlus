@@ -223,7 +223,11 @@ POST /sprawy/{id}/dokumenty (PDF, wiele plików)
 - Jedna reguła = jedna funkcja w `rules/`, rejestr `REGULY`. Funkcja **nie rzuca wyjątków** przy brakach.
 - Kolejność implementacji: najpierw zwykła ścieżka matki-pracownicy, potem wyjątki.
 - Kalkulator liczy dla każdej osoby osobno (własna podstawa), oś czasu łączy okresy obojga rodziców.
-- Kwoty w `Decimal`, zaokrąglenie do groszy na końcu.
+- Kwoty w `Decimal`; do groszy zaokrąglamy tylko tam, gdzie robi to ZUS: podstawę wymiaru i stawkę dzienną
+  (kwota za okres = stawka dzienna × liczba dni).
+- Zasiłek macierzyński matki: `rules/zasilek_macierzynski.py` – dwa wyniki (za urlop macierzyński i rodzicielski)
+  ze wspólnym ustaleniem prawa; poród w przyszłości → zawsze `warunkowo`. Pola wyliczane (B7, data prawa):
+  `rules/wyliczone.py`; podstawa wymiaru: `calculator/podstawa.py` (`ustal_podstawe`).
 - **Żadnych liczb z przepisów w kodzie** – tylko parametry z `params/`, wersja obowiązująca w dniu powstania prawa.
 
 ---

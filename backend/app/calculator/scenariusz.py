@@ -8,13 +8,14 @@ Dopóki nie ma ekranu scenariuszy, kalkulator liczy tylko scenariusz domyślny:
 from datetime import date
 from typing import Any
 
+from app.rules import wyliczone
+
 SCENARIUSZ_DOMYSLNY = "domyslny"
 
 
 def data_zdarzenia(fakty: dict[str, Any]) -> date | None:
     """Dzień porodu (albo przewidywany dzień porodu, dopóki dziecko się nie urodziło)."""
-    d = fakty.get("data_porodu") or fakty.get("pdp")
-    return date.fromisoformat(d) if d else None
+    return wyliczone.data_zdarzenia(fakty)
 
 
 def wniosek_81_5_w_terminie(fakty: dict[str, Any], p: dict[str, Any]) -> bool:

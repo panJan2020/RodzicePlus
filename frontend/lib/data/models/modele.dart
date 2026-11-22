@@ -466,41 +466,139 @@ class BrakujacePole {
       );
 }
 
+class Powod {
+  const Powod({required this.pole, required this.komunikat, this.wartosc});
+  final String pole;
+  final String? wartosc;
+  final String komunikat;
+
+  factory Powod.fromJson(Map<String, dynamic> j) =>
+      Powod(pole: j['pole'] as String, wartosc: j['wartosc'] as String?, komunikat: j['komunikat'] as String);
+}
+
+class Warunek {
+  const Warunek({required this.opis, this.ryzyko});
+  final String opis;
+  final String? ryzyko; // kod ryzyka, np. brak_ubezpieczenia_w_dniu_porodu
+
+  factory Warunek.fromJson(Map<String, dynamic> j) => Warunek(opis: j['opis'] as String, ryzyko: j['ryzyko'] as String?);
+}
+
+class OkresWyniku {
+  const OkresWyniku({required this.odDnia, required this.doDnia, required this.tygodnie});
+  final DateTime odDnia;
+  final DateTime doDnia;
+  final int tygodnie;
+
+  factory OkresWyniku.fromJson(Map<String, dynamic> j) => OkresWyniku(
+        odDnia: DateTime.parse(j['od'] as String),
+        doDnia: DateTime.parse(j['do'] as String),
+        tygodnie: j['tygodnie'] as int,
+      );
+}
+
+/// Kwoty jako tekst z kropką ("1234.56"), zawsze brutto.
+class KwotaWyniku {
+  const KwotaWyniku({
+    required this.miesieczna,
+    required this.zaOkres,
+    required this.stawka,
+    required this.stawkaDzienna,
+    required this.podstawaWymiaru,
+    this.brutto = true,
+  });
+  final String miesieczna;
+  final String zaOkres;
+  final String stawka;
+  final String stawkaDzienna;
+  final String podstawaWymiaru;
+  final bool brutto;
+
+  factory KwotaWyniku.fromJson(Map<String, dynamic> j) => KwotaWyniku(
+        miesieczna: j['miesieczna'] as String,
+        zaOkres: j['za_okres'] as String,
+        stawka: j['stawka'] as String,
+        stawkaDzienna: j['stawka_dzienna'] as String,
+        podstawaWymiaru: j['podstawa_wymiaru'] as String,
+        brutto: j['brutto'] as bool? ?? true,
+      );
+}
+
+List<BrakujacePole> _pola(Object? lista) =>
+    [for (final b in (lista as List? ?? [])) BrakujacePole.fromJson(b as Map<String, dynamic>)];
+
 class WynikSwiadczenia {
   const WynikSwiadczenia({
     required this.swiadczenie,
     required this.nazwa,
     required this.osobaId,
     required this.status,
+    this.scenariuszId = 'domyslny',
+    this.podsumowanie = '',
+    this.okres,
+    this.kwota,
     this.uzasadnienie = const [],
+    this.powody = const [],
+    this.warunki = const [],
     this.podstawaPrawna = const [],
     this.brakujacePola = const [],
+    this.coZrobic = const [],
+    this.orientacyjny = false,
+    this.polaDoPotwierdzenia = const [],
+    this.ryzyka = const [],
+    this.uwagi = const [],
     this.ktoWyplaca,
     this.ktoWyplacaOpis,
+    this.gdzieZlozyc,
+    this.wersjaParametrow = '',
   });
 
   final String swiadczenie;
   final String nazwa;
   final String osobaId;
+  final String scenariuszId;
   final StatusSwiadczenia status;
+  final String podsumowanie;
+  final OkresWyniku? okres; // null przy nie_przysluguje / brak_danych
+  final KwotaWyniku? kwota; // null, gdy brakuje danych do kwoty
   final List<String> uzasadnienie;
+  final List<Powod> powody;
+  final List<Warunek> warunki;
   final List<String> podstawaPrawna;
   final List<BrakujacePole> brakujacePola;
-  final String? ktoWyplaca; // zus | platnik
+  final List<String> coZrobic;
+  final bool orientacyjny;
+  final List<BrakujacePole> polaDoPotwierdzenia;
+  final List<String> ryzyka;
+  final List<String> uwagi;
+  final String? ktoWyplaca; // zus | platnik | null (nie wiemy)
   final String? ktoWyplacaOpis;
+  final String? gdzieZlozyc;
+  final String wersjaParametrow;
 
   factory WynikSwiadczenia.fromJson(Map<String, dynamic> j) => WynikSwiadczenia(
         swiadczenie: j['swiadczenie'] as String,
         nazwa: j['nazwa'] as String,
         osobaId: j['osoba_id'] as String,
+        scenariuszId: j['scenariusz_id'] as String? ?? 'domyslny',
         status: StatusSwiadczenia.zJson(j['status'] as String),
+        podsumowanie: j['podsumowanie'] as String? ?? '',
+        okres: j['okres'] == null ? null : OkresWyniku.fromJson(j['okres'] as Map<String, dynamic>),
+        kwota: j['kwota'] == null ? null : KwotaWyniku.fromJson(j['kwota'] as Map<String, dynamic>),
         uzasadnienie: _teksty(j['uzasadnienie']),
+        powody: [for (final p in (j['powody'] as List? ?? [])) Powod.fromJson(p as Map<String, dynamic>)],
+        warunki: [for (final w in (j['warunki'] as List? ?? [])) Warunek.fromJson(w as Map<String, dynamic>)],
         podstawaPrawna: _teksty(j['podstawa_prawna']),
-        brakujacePola: [
-          for (final b in (j['brakujace_pola'] as List? ?? [])) BrakujacePole.fromJson(b as Map<String, dynamic>),
-        ],
+        brakujacePola: _pola(j['brakujace_pola']),
+        coZrobic: _teksty(j['co_zrobic']),
+        orientacyjny: j['orientacyjny'] as bool? ?? false,
+        polaDoPotwierdzenia: _pola(j['pola_do_potwierdzenia']),
+        ryzyka: _teksty(j['ryzyka']),
+        uwagi: _teksty(j['uwagi']),
         ktoWyplaca: j['kto_wyplaca'] as String?,
         ktoWyplacaOpis: j['kto_wyplaca_opis'] as String?,
+        gdzieZlozyc: j['gdzie_zlozyc'] as String?,
+        wersjaParametrow: j['wersja_parametrow'] as String? ?? '',
       );
 }
 
@@ -513,6 +611,7 @@ class OkresZasilku {
     required this.stawka,
     required this.kwotaMiesieczna,
     required this.kwotaZaOkres,
+    this.stawkaDzienna = '',
     this.osobaId,
     this.uwagi = const [],
   });
@@ -523,6 +622,7 @@ class OkresZasilku {
   final DateTime doDnia;
   final int tygodnie;
   final String stawka; // "0.815"
+  final String stawkaDzienna; // "235.86"
   final String kwotaMiesieczna; // "1234.56"
   final String kwotaZaOkres;
   final List<String> uwagi;
@@ -534,6 +634,7 @@ class OkresZasilku {
         doDnia: DateTime.parse(j['do'] as String),
         tygodnie: j['tygodnie'] as int,
         stawka: j['stawka'] as String,
+        stawkaDzienna: j['stawka_dzienna'] as String? ?? '',
         kwotaMiesieczna: j['kwota_miesieczna'] as String,
         kwotaZaOkres: j['kwota_za_okres'] as String,
         uwagi: _teksty(j['uwagi']),
@@ -541,15 +642,17 @@ class OkresZasilku {
 }
 
 class OsobaKalkulatora {
-  const OsobaKalkulatora({required this.osobaId, required this.podstawaWymiaru, required this.suma});
+  const OsobaKalkulatora({required this.osobaId, required this.podstawaWymiaru, required this.suma, this.powrotDoPracy});
   final String osobaId;
   final String podstawaWymiaru;
   final String suma;
+  final DateTime? powrotDoPracy;
 
   factory OsobaKalkulatora.fromJson(Map<String, dynamic> j) => OsobaKalkulatora(
         osobaId: j['osoba_id'] as String,
         podstawaWymiaru: j['podstawa_wymiaru'] as String,
         suma: j['suma'] as String,
+        powrotDoPracy: j['powrot_do_pracy'] == null ? null : DateTime.parse(j['powrot_do_pracy'] as String),
       );
 }
 
@@ -560,6 +663,7 @@ class WynikKalkulatora {
     required this.okresy,
     required this.suma,
     required this.wersjaParametrow,
+    this.orientacyjny = false,
     this.ostrzezenia = const [],
   });
 
@@ -568,6 +672,7 @@ class WynikKalkulatora {
   final List<OkresZasilku> okresy;
   final String suma;
   final String wersjaParametrow;
+  final bool orientacyjny;
   final List<String> ostrzezenia;
 
   factory WynikKalkulatora.fromJson(Map<String, dynamic> j) => WynikKalkulatora(
@@ -576,6 +681,7 @@ class WynikKalkulatora {
         okresy: [for (final o in j['okresy'] as List) OkresZasilku.fromJson(o as Map<String, dynamic>)],
         suma: j['suma'] as String,
         wersjaParametrow: j['wersja_parametrow'] as String,
+        orientacyjny: j['orientacyjny'] as bool? ?? false,
         ostrzezenia: _teksty(j['ostrzezenia']),
       );
 }
