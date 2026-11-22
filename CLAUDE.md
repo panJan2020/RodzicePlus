@@ -260,8 +260,8 @@ Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze te�
 
 - Python 3.11+, FastAPI, Pydantic v2, `anthropic`, `pytest`. Uruchomienie: `uvicorn app.main:app --reload` w `backend/`.
 - `api/` = cienka warstwa: walidacja, wywołanie modułów, zwrot modelu Pydantic. Żadnej logiki prawnej w `api/`.
-- **Źródła:** każdy adapter w `sources/` implementuje `pobierz(sprawa, osoba) → list[WartoscPola]` i niczego nie
-  nadpisuje. Dane fikcyjnych użytkowników w `sources/dane/*.json`.
+- **Źródła:** każdy adapter w `sources/` implementuje `pobierz(sprawa, osoba) → {pole: WartoscPola}` i niczego nie
+  zapisuje (zapis robi `merge.dodaj`). Dane fikcyjnych użytkowników w `sources/dane/*.json`.
 - **Scalanie:** wszystkie zapisy wartości przechodzą przez `merge/` (wybór aktywnej, konflikty, niespójności).
 - **Reguły:** jedna funkcja na świadczenie w `rules/`, rejestr `REGULY`. Każda reguła deklaruje wymagane pola.
   Funkcja **nie rzuca wyjątków przy brakach danych**, tylko zwraca `brak_danych` z listą pól.
@@ -353,11 +353,11 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 - [x] Symulowane logowanie przez mObywatela _(21.11.2026)_
 - [x] Symulowane pobranie z ZUS danych o ubezpieczeniu → profil sprawy _(21.11.2026)_
 - [x] Drzewo pytań w backendzie (`/sprawy/{id}/dane`, statusy aktywne/zablokowane/wykluczone) + zakładka „Moje dane” _(21.11.2026)_
-  ⚠️ Działa na starym `FieldValue` (jedna wartość na pole) i starych ścieżkach API – do migracji w etapie 1.
+  (przeniesione na nowy model w etapie 1)
 
 ### Etap 1 – Model danych i najczęstsza ścieżka
-- [ ] Migracja na nowy model: `WartoscPola` (lista wartości + aktywna), osoby w sprawie, `merge/` z hierarchią
-  i konfliktami; adaptery `sources/` zamiast mocków; ścieżki API wg `docs/api.md`; `modele.dart`.
+- [x] Migracja na nowy model: `WartoscPola` (lista wartości + aktywna), osoby w sprawie, `merge/` z hierarchią
+  i konfliktami; adaptery `sources/` zamiast mocków; ścieżki API wg `docs/api.md`; `modele.dart`. _(22.11.2026)_
 - [ ] Reguła i kalkulator zasiłku macierzyńskiego (pracownica, 1 dziecko, 100% / 70% / 81,5%, liczba dzieci,
   „Za życiem”) z parametrów + 4 statusy wyniku + kto wypłaca.
 - **Gotowe, gdy:** testy przechodzą, „Moje dane” działa na nowym modelu.
