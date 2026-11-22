@@ -1,0 +1,52 @@
+{
+  "_opis": "Zapisane (zanonimizowane, FIKCYJNE) odpowiedzi Claude w układzie podobnym do sprawy testowej: ZAS-53, pismo ZUS, 4× Z-3, zrzut ZUS, decyzja. Żadnych danych z zestawów ZUS.",
+  "liczba_stron": 22,
+  "klasyfikacja": {"strony": [
+    {"strona": 1, "typ": "ZAS-53", "wariant": null, "strona_formularza": 1, "stron_formularza": 2, "poczatek_formularza": true, "osoba": "matka", "obrocona": false},
+    {"strona": 2, "typ": "ZAS-53", "wariant": null, "strona_formularza": 2, "stron_formularza": 2, "poczatek_formularza": false, "osoba": "matka", "obrocona": false},
+    {"strona": 3, "typ": "pismo_ZUS", "wariant": null, "strona_formularza": null, "stron_formularza": null, "poczatek_formularza": true, "osoba": null, "obrocona": false},
+    {"strona": 4, "typ": "Z-3", "wariant": "pierwszorazowy", "strona_formularza": 1, "stron_formularza": 4, "poczatek_formularza": true, "osoba": "matka", "obrocona": false},
+    {"strona": 5, "typ": "Z-3", "wariant": null, "strona_formularza": 2, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 6, "typ": "Z-3", "wariant": null, "strona_formularza": 3, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 7, "typ": "Z-3", "wariant": null, "strona_formularza": 4, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 8, "typ": "Z-3", "wariant": "w_kontynuacji", "strona_formularza": 1, "stron_formularza": 4, "poczatek_formularza": true, "osoba": "matka", "obrocona": false},
+    {"strona": 9, "typ": "Z-3", "wariant": null, "strona_formularza": 2, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 10, "typ": "Z-3", "wariant": null, "strona_formularza": 3, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 11, "typ": "Z-3", "wariant": null, "strona_formularza": 4, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 12, "typ": "Z-3", "wariant": "w_kontynuacji", "strona_formularza": 1, "stron_formularza": 4, "poczatek_formularza": true, "osoba": "matka", "obrocona": false},
+    {"strona": 13, "typ": "Z-3", "wariant": null, "strona_formularza": 2, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 14, "typ": "Z-3", "wariant": null, "strona_formularza": 3, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 15, "typ": "Z-3", "wariant": null, "strona_formularza": 4, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 16, "typ": "Z-3", "wariant": "w_kontynuacji", "strona_formularza": 1, "stron_formularza": 4, "poczatek_formularza": true, "osoba": "matka", "obrocona": false},
+    {"strona": 17, "typ": "Z-3", "wariant": null, "strona_formularza": 2, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 18, "typ": "Z-3", "wariant": null, "strona_formularza": 3, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 19, "typ": "Z-3", "wariant": null, "strona_formularza": 4, "stron_formularza": 4, "poczatek_formularza": false, "osoba": null, "obrocona": false},
+    {"strona": 20, "typ": "zrzut_systemu_ZUS", "wariant": null, "strona_formularza": null, "stron_formularza": null, "poczatek_formularza": true, "osoba": "matka", "obrocona": true},
+    {"strona": 21, "typ": "zrzut_systemu_ZUS", "wariant": null, "strona_formularza": null, "stron_formularza": null, "poczatek_formularza": false, "osoba": "matka", "obrocona": true},
+    {"strona": 22, "typ": "decyzja_ZUS", "wariant": null, "strona_formularza": null, "stron_formularza": null, "poczatek_formularza": true, "osoba": null, "obrocona": false}
+  ]},
+  "odczyt": {
+    "ZAS-53": {
+      "ezla": [{"wartosc": [{"od": "2026-03-02", "do": "2026-03-31", "kod": null}], "osoba": "matka", "strona": 1, "pewnosc": 0.85}],
+      "po_ustaniu": [{"wartosc": false, "osoba": "matka", "strona": 2, "pewnosc": 0.7}]
+    },
+    "pismo_ZUS": {"braki": ["zaświadczenie płatnika składek Z-3"], "strona": 1},
+    "Z-3": {
+      "tytuly": [{"wartosc": ["umowa_o_prace"], "osoba": "matka", "strona": 1, "pewnosc": 0.95}],
+      "etat": [{"wartosc": 1, "osoba": "matka", "strona": 1, "pewnosc": 0.9}],
+      "zatrudnienie_od": [{"wartosc": "2024-02-01", "osoba": "matka", "strona": 1, "pewnosc": 0.9}],
+      "platnik_ponad_20": [{"wartosc": "do_20", "osoba": null, "strona": 2, "pewnosc": 0.5, "tytul": null}],
+      "miesiace": [{"wartosc": [
+        {"miesiac": "2026-01", "skladniki_stale": 5000, "skladniki_zmienne": null, "dni_przepracowane": 20, "dni_obowiazujace": 20, "stale_pelna_kwota": null},
+        {"miesiac": "2026-02", "skladniki_stale": 5000, "skladniki_zmienne": 250.5, "dni_przepracowane": 20, "dni_obowiazujace": 20, "stale_pelna_kwota": null}
+      ], "osoba": "matka", "strona": 3, "pewnosc": 0.8}]
+    },
+    "zrzut_systemu_ZUS": {
+      "okresy_ubezpieczenia": [{"wartosc": [
+        {"tytul": "umowa_o_prace", "platnik": "Firma Przykładowa", "od": "2024-02-01", "do": null, "chorobowe": true, "chorobowe_dobrowolne": false}
+      ], "osoba": "matka", "strona": 2, "pewnosc": 0.9}],
+      "chorobowe_od": [{"wartosc": "2024-02-01", "osoba": "matka", "strona": 1, "pewnosc": 0.9}]
+    },
+    "decyzja_ZUS": {"tekst": "Wypłacono zasiłek chorobowy za okres zwolnienia.", "strona": 1}
+  }
+}

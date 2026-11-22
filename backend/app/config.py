@@ -21,3 +21,7 @@ SOURCES_DATA_DIR = BASE_DIR / "sources" / "dane"  # fikcyjni użytkownicy (symul
 
 # Limit uploadu – skany zestawów ZUS mają kilka MB.
 MAX_UPLOAD_MB = 30
+
+# Cache odpowiedzi Claude po hashu pliku (data/cache/, poza repo). CACHE_ODCZYTU=0 wyłącza.
+CACHE_DIR = BASE_DIR.parent.parent / "data" / "cache"
+CACHE_ODCZYTU: bool = os.getenv("CACHE_ODCZYTU", "1") != "0"

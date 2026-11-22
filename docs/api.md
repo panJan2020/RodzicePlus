@@ -79,7 +79,7 @@ Rozstrzygnięcie konfliktu = `PUT …/pola/{pole}/aktywna` (2.3).
 
 | Metoda | Ścieżka | Opis | Opis app |
 |---|---|---|---|
-| POST | `/sprawy/{id}/dokumenty` | multipart, pole `pliki` (1..n PDF/JPG/PNG, max 30 MB każdy) → `202 {"zadanie_id": "z1"}` | 6 |
+| POST | `/sprawy/{id}/dokumenty` | multipart, pole `pliki` (1..n plików **PDF**, max 30 MB każdy; inny format → `415`, za duży → `413`) → `202 {"zadanie_id": "z1"}` – jedno zadanie na całe wgranie | 6 |
 | GET | `/zadania/{zadanie_id}` | `Zadanie` – stan odczytu; Flutter odpytuje co 3 s | 6 |
 | GET | `/sprawy/{id}/dokumenty` | rozpoznane dokumenty → `[Dokument]` | 6, ekran 5 |
 | DELETE | `/sprawy/{id}/dokumenty/{dokument_id}` | usuwa dokument **i wartości z niego odczytane** → `ZmianaDanych` | 6 |
@@ -251,16 +251,22 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "etap": "odczyt",                // przyjecie | klasyfikacja | podzial | odczyt | scalanie | wyniki
  "postep": 0.6, "komunikat": "Odczytujemy zaświadczenie Z-3 (2 z 4)…",
  "dokumenty": ["d1", "d2"],       // rozpoznane do tej pory
- "zmiana_danych": null,           // ZmianaDanych po zakończeniu
- "blad": null}
+ "zmiana_danych": null,           // ZmianaDanych po zakończeniu (także po błędzie – część mogła się zapisać)
+ "blad": null,                    // polski komunikat dla użytkownika
+ "wywolania": [{"etap": "klasyfikacja", "model": "claude-sonnet-5-5", "czas_s": 7.6,
+                "tokeny_wejscie": 21322, "tokeny_wyjscie": 921, "cache": false}]}  // diagnostyka, bez treści
 
-// Dokument
+// Dokument – GET /sprawy/{id}/dokumenty; typ = kod z backend/app/extraction/schema.py (TYPY):
+// ZAM, ZUR, ZAO, ZAS-53, Z-3, Z-3a, Z-3b, ZAS-12, akt_urodzenia, zaswiadczenie_lekarskie, zaswiadczenie_za_zyciem,
+// wniosek_urlop, poswiadczenie_ubezpieczenia, zrzut_systemu_ZUS, pismo_ZUS, decyzja_ZUS, inne
 {"id": "d2", "plik": "sprawa.pdf", "typ": "Z-3", "typ_opis": "Zaświadczenie płatnika składek",
  "wariant": "pierwszorazowy",     // pierwszorazowy | w_kontynuacji | null
- "strony": [5, 12], "osoba_id": "o1",
+ "strony": [5, 6, 7, 8],          // numery stron w pliku (od 1)
+ "osoba_id": "o1",                // null dla pisma i decyzji ZUS
  "wystawca": "pracodawca", "archiwalny": false,   // true dla ZUR, ZAO, Z-3b
  "rola": "dane",                  // dane | decyzja_zus | pismo_zus
- "liczba_pol": 14, "do_sprawdzenia": 1}
+ "liczba_pol": 14, "do_sprawdzenia": 1,   // do_sprawdzenia = wartości z pewnością < 0,6
+ "informacja": []}                // pismo ZUS: czego brakuje (bez danych osobowych)
 
 // Porownanie – GET /sprawy/{id}/porownanie
 {"decyzja_zus": {"tekst": "W sprawie przyznano zasiłek chorobowy.", "dokument_id": "d7", "strona": 38,

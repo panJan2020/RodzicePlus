@@ -1,4 +1,4 @@
-"""Sprawy i osoby, dane osoby (drzewo pytań), kreator, odpowiedzi użytkownika, upload dokumentów (docs/api.md 2.2–2.3, 2.6).
+"""Sprawy i osoby, dane osoby (drzewo pytań), kreator, odpowiedzi użytkownika (docs/api.md 2.2–2.3). Upload dokumentów – api/dokumenty.py.
 
 Sprawa może być anonimowa (bez logowania) – wtedy o1 ma `zalogowana: false`. Sprawa zalogowanej osoby
 jest dostępna tylko z jej tokenem.
@@ -6,15 +6,13 @@ jest dostępna tylko z jej tokenem.
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app import merge, sources
 from app.api.wspolne import (Liczniki, Obserwator, ZmianaDanych, liczniki, login_opcjonalny, osoba_lub_404,
                              sprawa_lub_404)
-from app.config import MAX_UPLOAD_MB
 from app.domain.model import Kanal, Rola, Sprawa, WartoscPola, Wystawca
-from app.extraction import claude_client, mapowanie
 from app.questions import engine
 from app.storage import memory
 
@@ -167,34 +165,3 @@ def zapisz_odpowiedzi(sprawa_id: str, odpowiedzi: list[Odpowiedz],
             osoba.rola = engine.rola_z_odpowiedzi(osoba.wartosc("rola"))
     memory.zapisz(s)
     return obs.zmiana()
-
-
-# ---------- upload (odczyt skanów) – pełna wersja w etapie 2 ----------
-
-def _przetworz(zid: str, sprawa_id: str, pdf: bytes, plik: str) -> None:
-    try:
-        wynik = claude_client.odczytaj_pdf(pdf)
-        s = memory.pobierz(sprawa_id)
-        mapowanie.zapisz_odczyt(s, wynik["dane"], plik)
-        memory.zapisz(s)
-        memory.aktualizuj_zadanie(zid, status="gotowe", strony=wynik["dane"].get("strony"),
-                                  uwagi=wynik["dane"].get("uwagi"), tokeny=wynik["uzycie_tokenow"])
-    except Exception as e:  # noqa: BLE001 – błąd pokazujemy użytkownikowi
-        memory.aktualizuj_zadanie(zid, status="blad", blad=str(e))
-
-
-@router.post("/{sprawa_id}/dokumenty", status_code=202)
-async def wgraj_dokument(sprawa_id: str, tlo: BackgroundTasks, plik: UploadFile = File(...),
-                         login: str | None = Depends(login_opcjonalny)) -> dict:
-    """Odczyt skanu trwa kilkadziesiąt sekund → zwracamy id zadania, Flutter odpytuje GET /zadania/{id}."""
-    s = sprawa_lub_404(sprawa_id, login)
-    if plik.content_type != "application/pdf":
-        raise HTTPException(415, "Obsługujemy tylko PDF")
-    dane_pliku = await plik.read()
-    if len(dane_pliku) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(413, f"Plik większy niż {MAX_UPLOAD_MB} MB")
-    nazwa = plik.filename or "dokument.pdf"
-    s.dokumenty.append(nazwa)
-    zid = memory.nowe_zadanie(sprawa_id, nazwa)
-    tlo.add_task(_przetworz, zid, sprawa_id, dane_pliku, nazwa)
-    return {"zadanie_id": zid}

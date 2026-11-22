@@ -33,8 +33,11 @@ def zapisz(s: Sprawa) -> None:
 
 def nowe_zadanie(sprawa_id: str, plik: str) -> str:
     zid = "z" + uuid.uuid4().hex[:10]
-    _zadania[zid] = {"id": zid, "sprawa_id": sprawa_id, "plik": plik, "status": "w_toku",
-                     "utworzono": datetime.now(timezone.utc).isoformat(), "blad": None}
+    # Kształt `Zadanie` z docs/api.md 3.4 (+ `wywolania`: model, czas i tokeny – bez treści dokumentów).
+    _zadania[zid] = {"id": zid, "sprawa_id": sprawa_id, "plik": plik, "status": "w_toku", "etap": "przyjecie",
+                     "postep": 0.0, "komunikat": "Przyjęliśmy pliki. Odczyt może potrwać do kilku minut.",
+                     "dokumenty": [], "zmiana_danych": None, "blad": None, "wywolania": [],
+                     "utworzono": datetime.now(timezone.utc).isoformat()}
     return zid
 
 

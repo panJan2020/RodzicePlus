@@ -87,6 +87,23 @@ class Osoba(BaseModel):
         return w.wartosc if w is not None else domyslna
 
 
+class Dokument(BaseModel):
+    """Jeden rozpoznany dokument (egzemplarz formularza) z wgranego pliku (docs/api.md 3.4)."""
+    id: str                           # "d1", "d2", …
+    plik: str
+    typ: str                          # kod z extraction/schema.py TYPY, np. "Z-3"
+    typ_opis: str
+    wariant: str | None = None        # pierwszorazowy | w_kontynuacji
+    strony: list[int]                 # numery stron w pliku (od 1)
+    osoba_id: str | None = None
+    wystawca: Wystawca
+    archiwalny: bool = False          # ZUR, ZAO, Z-3b
+    rola: str = "dane"                # dane | decyzja_zus | pismo_zus
+    liczba_pol: int = 0
+    do_sprawdzenia: int = 0           # wartości z pewnością poniżej progu
+    informacja: list[str] = Field(default_factory=list)  # pismo ZUS: czego brakuje (bez danych osobowych)
+
+
 class Sprawa(BaseModel):
     id: str
     nazwa: str = "Moja sprawa"
@@ -94,7 +111,7 @@ class Sprawa(BaseModel):
     utworzono: datetime = Field(default_factory=_teraz)
     wlasciciel: str | None = None     # login osoby zalogowanej; None = sprawa anonimowa
     osoby: list[Osoba] = Field(default_factory=list)
-    dokumenty: list[str] = Field(default_factory=list)
+    dokumenty: list[Dokument] = Field(default_factory=list)
     # Wynik ze strony decyzji ZUS – TYLKO do porównania/testów, nigdy jako dane wejściowe.
     oczekiwany_wynik: str | None = None
     liczniki_id: dict[str, int] = Field(default_factory=dict)

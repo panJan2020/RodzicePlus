@@ -54,6 +54,10 @@ Dlatego ścieżka **upload → wynik → porównanie z decyzją ZUS** ma najwyż
 4. **Sprawdź przed oddaniem:** `pytest` (backend), uruchomienie ekranu w 375 px i 1440 px (frontend).
 5. **Commit po zakończonym etapie**, opis po polsku.
 
+6. Tryb hackathonu: nowe testy tylko dla reguł prawnych, kwot i podziału/mapowania dokumentów.
+   Nie pisz nowych testów widżetów Fluttera – UI sprawdzam ręcznie (375 px i 1440 px).
+   pytest i commit raz na podetap, nie po każdym kroku planu.
+
 ### Raport po każdym prompcie, w którym zmieniono pliki (OBOWIĄZKOWY)
 
 ```
@@ -282,8 +286,13 @@ Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze te�
 - Model z `.env`: `CLAUDE_MODEL` (domyślnie `claude-sonnet-5-5`). Klucz: `ANTHROPIC_API_KEY`.
 - PDF wysyłamy jako blok `document` (base64). Zestawy ZUS to **skany** (bez warstwy tekstowej, częściowo odręczne,
   częściowo zamazane, niektóre strony obrócone), a Claude widzi strony jako obrazy.
-- Odpowiedź **wymuszona narzędziem** (`tool_choice`). Schematy per typ dokumentu generowane z `questions/katalog.json`
-  (pola z `z_dokumentow: true`). Każde pole ma: wartość, osobę, typ dokumentu, numer strony, pewność 0–1.
+- Odpowiedź w **wymuszonym schemacie JSON** (structured outputs: `output_config.format` = `json_schema`;
+  wymuszone narzędzie `tool_choice` daje 400 na nowych modelach). `fallbacks: "default"` – przy odmowie API ponawia
+  na innym modelu; logujemy, który model odpowiedział. Schematy per typ dokumentu generowane z `questions/katalog.json`
+  (pola z `z_dokumentow: true` i `upload:<typ>` w `zrodla`). Każde pole ma: wartość, osobę, numer strony, pewność 0–1.
+- Dwa przebiegi: **jedno** wywołanie klasyfikacji na cały PDF + **jedno** wywołanie odczytu na dokument (tylko jego
+  strony, wycięte z PDF). Podział na dokumenty robi kod (`extraction/podzial.py`). Kod: `extraction/pipeline.py`.
+- Na razie przyjmujemy tylko PDF (inne formaty → 415). Test ręczny: `python -m scripts.odczyt_sprawy <plik.pdf>`.
 - Przebieg (zadanie w tle):
   1. **klasyfikacja stron** (ZAM, ZAS-53, ZUR, ZAO, Z-3, Z-3a, Z-3b, ZAS-12, akt urodzenia, zaświadczenie lekarskie,
      wniosek o urlop, pismo ZUS, poświadczenie ubezpieczenia, zrzut systemu ZUS, decyzja / wynik sprawy…),
@@ -297,7 +306,7 @@ Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze te�
 - Endpointy: `POST /sprawy/{id}/dokumenty` → `202 {zadanie_id}` → Flutter odpytuje `GET /zadania/{id}` co 3 s.
 - Wartości z pewnością < 0,6 oznaczone w UI do sprawdzenia; użytkownik może poprawić każdą wartość
   (poprawka = nowa wartość użytkownika, odczyt AI zostaje).
-- Cache wyników odczytu po hashu pliku (oszczędność kosztów podczas developmentu).
+- Cache wyników odczytu po hashu pliku w `data/cache/` (poza repo; `CACHE_ODCZYTU=0` wyłącza).
 - Nie loguj treści dokumentów ani danych osobowych. Loguj tylko zużycie tokenów i czas.
 - Prompty i schematy: `backend/app/extraction/{prompts,schema}.py`. Zmieniając prompt, sprawdź wynik na min. 2 sprawach.
 - Formularze ZUR, ZAO i Z-3b zlikwidowano od 24.10.2026, ale **występują w sprawach testowych**, więc trzeba je rozpoznawać.

@@ -168,9 +168,10 @@ Wszystkie adaptery poza `upload` i `kreator` są **symulacjami** na danych fikcy
 ```
 POST /sprawy/{id}/dokumenty (PDF, wiele plików)
   → zadanie_id (zadanie w tle; Flutter odpytuje GET /zadania/{id} co 3 s)
-     1. klasyfikacja stron         typ dokumentu dla każdej strony
-     2. podział na dokumenty       egzemplarze formularzy (stopka „Strona x z 8”, pierwszorazowy / w kontynuacji)
-     3. odczyt pól                 schemat per typ dokumentu, wartość + strona + pewność
+     1. klasyfikacja stron         JEDNO wywołanie na cały PDF: typ, wariant, „Strona x z y”, osoba każdej strony
+     2. podział na dokumenty       kod, bez AI: egzemplarze formularzy (stopka „Strona x z 8”, pierwszorazowy / w kontynuacji)
+     3. odczyt pól                 JEDNO wywołanie na dokument (tylko jego strony), schemat tylko dla jego typu,
+                                   wartość + strona + pewność; odpowiedź w wymuszonym schemacie JSON
      4. mapowanie na WartoscPola   wystawca wg typu dokumentu (Z-3 → pracodawca, zrzut systemu ZUS → zus)
      5. merge                      aktywne wartości, konflikty, niespójności
      6. rules + calculator         wyniki
@@ -260,7 +261,7 @@ POST /sprawy/{id}/dokumenty (PDF, wiele plików)
 2. **Wiele wartości na pole + aktywna wartość.** Konflikty się nie gubią, użytkownik może wrócić do innego źródła.
 3. **Domyślny wybór według hierarchii wiarygodności.** Konflikt nigdy nie blokuje wyniku.
 4. **Fakty oddzielone od scenariuszy.** Kalkulatory c i d z treści zadania to porównanie scenariuszy na tych samych faktach.
-5. **AI tylko czyta, kod decyduje.** Claude zwraca dane przez wymuszone narzędzie (JSON wg schematu). Prawo do
+5. **AI tylko czyta, kod decyduje.** Claude zwraca dane w wymuszonym schemacie JSON (structured outputs). Prawo do
    świadczeń i kwoty liczy deterministyczny kod z testami.
 6. **Parametry prawne poza kodem, wersjonowane datą.** Edycja w panelu admina.
 7. **Treści poza kodem** (`content/`). Poradniki, ryzyka, organizacje i linki można poprawiać bez programisty.
@@ -279,7 +280,7 @@ POST /sprawy/{id}/dokumenty (PDF, wiele plików)
 | Wynik sprawy w różnych miejscach pliku | Rozpoznawanie strony wyniku po treści; `oczekiwany_wynik` nigdy jako dane wejściowe |
 | Strony obrócone (np. zrzut systemu ZUS) | Prompt: „strona może być obrócona”; w razie problemów obracanie przed wysłaniem |
 | Czas odpowiedzi 30–90 s | Zadanie w tle + polling + komunikat „to może potrwać do 2 minut” |
-| Koszt i limity API | Jeden przebieg na plik; zapisywanie zużycia tokenów; cache wyników po hashu pliku |
+| Koszt i limity API | Klasyfikacja raz na plik + jeden odczyt na dokument; zapisywanie zużycia tokenów i modelu; cache wyników po hashu pliku (`data/cache/`) |
 | Halucynacje | „Tylko to, co widać”, schemat z `enum`, weryfikacja przez użytkownika, porównanie z decyzją ZUS |
 | Bardzo duże PDF-y | Limit uploadu 30 MB; dzielenie na części, jeśli plik przekroczy limity API |
 | Prywatność (RODO) | Klucz i wywołania tylko w backendzie; brak logowania treści dokumentów; dane w pamięci; w produkcji: umowa powierzenia, retencja |

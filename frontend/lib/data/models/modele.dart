@@ -140,6 +140,97 @@ class ZmianaDanych {
 }
 
 // ---------------------------------------------------------------------------
+// Dokumenty i zadania (upload – docs/api.md 2.6, 3.4)
+// ---------------------------------------------------------------------------
+
+/// Rozpoznany dokument (egzemplarz formularza) z wgranego pliku.
+class Dokument {
+  const Dokument({
+    required this.id,
+    required this.plik,
+    required this.typ,
+    required this.typOpis,
+    this.wariant,
+    required this.strony,
+    this.osobaId,
+    required this.wystawca,
+    required this.archiwalny,
+    required this.rola,
+    required this.liczbaPol,
+    required this.doSprawdzenia,
+    required this.informacja,
+  });
+
+  final String id;
+  final String plik;
+  final String typ; // np. "Z-3", "pismo_ZUS", "decyzja_ZUS"
+  final String typOpis;
+  final String? wariant; // pierwszorazowy | w_kontynuacji
+  final List<int> strony;
+  final String? osobaId;
+  final String wystawca;
+  final bool archiwalny;
+  final String rola; // dane | decyzja_zus | pismo_zus
+  final int liczbaPol;
+  final int doSprawdzenia;
+  final List<String> informacja; // pismo ZUS: czego brakuje
+
+  factory Dokument.fromJson(Map<String, dynamic> j) => Dokument(
+        id: j['id'] as String,
+        plik: j['plik'] as String,
+        typ: j['typ'] as String,
+        typOpis: j['typ_opis'] as String,
+        wariant: j['wariant'] as String?,
+        strony: ((j['strony'] as List?) ?? const []).map((e) => e as int).toList(),
+        osobaId: j['osoba_id'] as String?,
+        wystawca: j['wystawca'] as String,
+        archiwalny: (j['archiwalny'] as bool?) ?? false,
+        rola: (j['rola'] as String?) ?? 'dane',
+        liczbaPol: (j['liczba_pol'] as int?) ?? 0,
+        doSprawdzenia: (j['do_sprawdzenia'] as int?) ?? 0,
+        informacja: _teksty(j['informacja']),
+      );
+}
+
+/// Stan odczytu dokumentów w tle – GET /zadania/{id}, odpytywany co 3 s.
+class Zadanie {
+  const Zadanie({
+    required this.id,
+    required this.status,
+    required this.etap,
+    required this.postep,
+    this.komunikat,
+    required this.dokumenty,
+    this.zmianaDanych,
+    this.blad,
+  });
+
+  final String id;
+  final String status; // w_toku | gotowe | blad
+  final String etap; // przyjecie | klasyfikacja | podzial | odczyt | scalanie | wyniki
+  final double postep; // 0–1
+  final String? komunikat;
+  final List<String> dokumenty;
+  final ZmianaDanych? zmianaDanych;
+  final String? blad;
+
+  bool get wToku => status == 'w_toku';
+
+  factory Zadanie.fromJson(Map<String, dynamic> j) => Zadanie(
+        id: j['id'] as String,
+        status: j['status'] as String,
+        etap: (j['etap'] as String?) ?? 'przyjecie',
+        postep: ((j['postep'] as num?) ?? 0).toDouble(),
+        komunikat: j['komunikat'] as String?,
+        dokumenty: _teksty(j['dokumenty']),
+        zmianaDanych: j['zmiana_danych'] == null
+            ? null
+            : ZmianaDanych.fromJson(j['zmiana_danych'] as Map<String, dynamic>),
+        blad: j['blad'] as String?,
+      );
+}
+
+// ---------------------------------------------------------------------------
 // Ubezpieczenie (GET /sprawy/{id}/ubezpieczenie – docs/api.md 3.5)
 // ---------------------------------------------------------------------------
 
@@ -178,7 +269,7 @@ class OkresUbezpieczenia {
         odDnia: DateTime.parse(j['od'] as String),
         doDnia: _dataLubNull(j['do']),
         wymiarEtatu: j['wymiar_etatu'] as String?,
-        chorobowe: j['chorobowe'] as bool,
+        chorobowe: (j['chorobowe'] as bool?) ?? false,
         chorobowoDobrowolne: (j['chorobowe_dobrowolne'] as bool?) ?? false,
         aktywny: j['aktywny'] as bool,
         zrodloOpis: j['zrodlo_opis'] as String?,

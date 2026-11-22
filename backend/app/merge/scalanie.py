@@ -73,6 +73,17 @@ def usun(osoba: Osoba, pole: str, kanal: Kanal, dokument_id: str | None = None, 
     return True
 
 
+def usun_dokument(sprawa: Sprawa, dokument_id: str, prog: float | None = None) -> int:
+    """Usuwa wszystkie wartości odczytane z dokumentu (u wszystkich osób) i przelicza aktywne. Zwraca liczbę usuniętych."""
+    usuniete = 0
+    for o in sprawa.osoby:
+        for pole in list(o.pola):
+            przed = len(o.pola[pole])
+            if usun(o, pole, Kanal.UPLOAD, dokument_id, prog):
+                usuniete += przed - len(o.pola.get(pole, []))
+    return usuniete
+
+
 def przelicz(osoba: Osoba, pole: str, prog: float | None = None) -> None:
     """Ustawia flagę `aktywna` – ręczny wybór użytkownika albo najlepsza według hierarchii."""
     wartosci = osoba.pola.get(pole, [])

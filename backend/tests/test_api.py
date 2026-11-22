@@ -80,3 +80,31 @@ def test_brakujace_pola_po_odpowiedzi_na_a1_art29():
 
 def test_zadania_nowa_sciezka():
     assert c.get("/zadania/nieistnieje").status_code == 404
+
+
+def test_upload_dokumentow_zadanie_lista_i_usuwanie(monkeypatch):
+    from app import config
+    from app.extraction import claude_client
+    from tests.test_mapowanie_odczytu import FIKSTURA, _pusty_pdf, falszywe_zapytaj
+
+    monkeypatch.setattr(config, "CACHE_ODCZYTU", False)
+    monkeypatch.setattr(claude_client, "zapytaj", falszywe_zapytaj([]))
+    sid = c.post("/sprawy").json()["id"]
+
+    r = c.post(f"/sprawy/{sid}/dokumenty", files=[("pliki", ("zdjecie.jpg", b"\xff\xd8\xff\xe0", "image/jpeg"))])
+    assert r.status_code == 415 and "PDF" in r.json()["detail"]
+
+    pdf = _pusty_pdf(FIKSTURA["liczba_stron"])
+    r = c.post(f"/sprawy/{sid}/dokumenty", files=[("pliki", ("sprawa.pdf", pdf, "application/pdf"))])
+    assert r.status_code == 202
+    z = c.get(f"/zadania/{r.json()['zadanie_id']}").json()  # TestClient wykonuje zadanie w tle od razu
+    assert z["status"] == "gotowe" and z["postep"] == 1.0 and len(z["dokumenty"]) == 8
+    assert z["zmiana_danych"]["dodano"] > 0 and all("tokeny_wejscie" in w for w in z["wywolania"])
+
+    dok = c.get(f"/sprawy/{sid}/dokumenty").json()
+    assert [d["typ"] for d in dok].count("Z-3") == 4 and dok[0]["typ_opis"].startswith("Wniosek")
+    assert c.get(f"/sprawy/{sid}").json()["ma_decyzje_zus"] is True
+
+    r = c.delete(f"/sprawy/{sid}/dokumenty/{dok[-2]['id']}")  # zrzut ZUS
+    assert r.status_code == 200 and "okresy_ubezpieczenia" in r.json()["zmieniono_aktywne"]
+    assert c.delete(f"/sprawy/{sid}/dokumenty/d999").status_code == 404

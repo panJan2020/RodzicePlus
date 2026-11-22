@@ -2,6 +2,10 @@
 data/sprawy_zus/*
 !data/sprawy_zus/.gitkeep
 *.pdf
+# Cache odczytu dokumentów (odpowiedzi Claude z danymi ze spraw)
+data/cache/
+
+git check-ignore -v backend/.env
 
 # Sekrety
 .env

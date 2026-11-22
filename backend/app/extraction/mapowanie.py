@@ -1,34 +1,59 @@
-"""Odczyt skanu (wynik narzędzia Claude) → WartoscPola w sprawie (docs/architektura.md, rozdz. 5, krok 4).
+"""Odczyt dokumentu (JSON od Claude) → Dokument + WartoscPola w sprawie (docs/architektura.md, rozdz. 5, krok 4).
 
-Wystawca zależy od typu dokumentu (Z-3 → pracodawca, poświadczenie / zrzut systemu ZUS → zus, ZAM → uzytkownik).
-Zapis zawsze przez `merge.dodaj` – odczyt AI nie nadpisuje innych źródeł, tylko dodaje wartość.
-Pełny przebieg (podział na egzemplarze, porównanie z decyzją ZUS) – etap 2.
+- Wystawca wg typu dokumentu (Z-3 → pracodawca, poświadczenie / zrzut systemu ZUS → zus, ZAM → uzytkownik).
+- Numer strony z odczytu dotyczy wyciętego dokumentu – zamieniamy go na numer strony w oryginalnym pliku.
+- Zapis zawsze przez `merge.dodaj` – odczyt AI nie nadpisuje innych źródeł, tylko dodaje wartość.
+- Pismo ZUS → żadnych pól, tylko `Dokument.informacja` (czego brakuje).
+- Decyzja ZUS → tylko `Sprawa.oczekiwany_wynik` (do porównania, nigdy dane wejściowe).
 """
-from decimal import Decimal
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app import merge
-from app.domain.model import Kanal, Osoba, Rola, Sprawa, WartoscPola, Wystawca
+from app.domain.model import Dokument, Kanal, Osoba, Rola, Sprawa, WartoscPola
+from app.extraction.podzial import Fragment
+from app.extraction.schema import POLA_NA_TYTUL, TYPY
+from app.merge.scalanie import prog_pewnosci
 from app.questions import engine
 
-WYSTAWCA_DOKUMENTU: dict[str, Wystawca] = {
-    "ZAM": Wystawca.UZYTKOWNIK, "ZAS-53": Wystawca.UZYTKOWNIK, "wniosek_urlop": Wystawca.UZYTKOWNIK,
-    "oswiadczenie": Wystawca.UZYTKOWNIK, "POG": Wystawca.UZYTKOWNIK, "inne": Wystawca.UZYTKOWNIK,
-    "Z-3": Wystawca.PRACODAWCA, "Z-3a": Wystawca.PRACODAWCA, "Z-3b": Wystawca.PRACODAWCA, "ZAS-12": Wystawca.PRACODAWCA,
-    "akt_urodzenia": Wystawca.URZAD, "zaswiadczenie_lekarskie": Wystawca.LEKARZ,
-    "poswiadczenie_ubezpieczenia": Wystawca.ZUS, "zrzut_systemu_ZUS": Wystawca.ZUS,
-    "pismo_ZUS": Wystawca.ZUS, "opis_wyniku": Wystawca.ZUS,
-}
+# Pola liczbowe zapisywane jak w źródłach ZUS – jako tekst Decimal z 2 miejscami (np. etat "1.00").
+POLA_DZIESIETNE = {"etat"}
 
 
-def _osoba(s: Sprawa, pole: str, rola: str | None) -> Osoba:
-    """Właściciel pola: dziecko dla pól dziecka, w innym razie osoba o podanej roli (brak → wnioskodawca)."""
-    q = engine.pytanie_dla_pola(pole)
-    if (q and q.get("osoba") == ["dziecko"]) or rola == Rola.DZIECKO.value:
+# ---------- osoby ----------
+
+def _osoba_roli(s: Sprawa, rola: str | None) -> Osoba:
+    """Osoba o podanej roli (tworzona, gdy jej nie ma); brak roli → wnioskodawca."""
+    if rola == Rola.DZIECKO.value:
         return next((o for o in s.osoby if o.rola == Rola.DZIECKO), None) or s.dodaj_osobe(Rola.DZIECKO, "Dziecko")
     if rola == Rola.OJCIEC.value:
-        return next((o for o in s.osoby if o.rola == Rola.OJCIEC), None) or s.dodaj_osobe(Rola.OJCIEC)
+        return next((o for o in s.osoby if o.rola in (Rola.OJCIEC, Rola.DRUGI_RODZIC)), None) or s.dodaj_osobe(Rola.OJCIEC)
+    if rola == Rola.MATKA.value:
+        return next((o for o in s.osoby if o.rola == Rola.MATKA), None) or s.dodaj_osobe(Rola.MATKA)
     return s.wnioskodawca() or s.dodaj_osobe(Rola.MATKA)
+
+
+def _osoba_pola(s: Sprawa, pole: str, rola: str | None) -> Osoba:
+    """Właściciel pola: dziecko dla pól tylko dziecka, matka dla pól tylko matki, inaczej wskazana osoba."""
+    q = engine.pytanie_dla_pola(pole)
+    osoby = (q or {}).get("osoba") or []
+    if osoby == ["dziecko"]:
+        return _osoba_roli(s, Rola.DZIECKO.value)
+    if osoby == ["matka"]:
+        return _osoba_roli(s, Rola.MATKA.value)
+    if rola == Rola.DZIECKO.value and "dziecko" not in osoby:
+        rola = None  # pole rodzica przypisane do dziecka – bierzemy osobę dokumentu
+    return _osoba_roli(s, rola)
+
+
+# ---------- normalizacja wartości ----------
+
+def _data(v: Any) -> str | None:
+    try:
+        return date.fromisoformat(str(v)).isoformat()
+    except (TypeError, ValueError):
+        return None
 
 
 def _kwota(v: Any) -> str | None:
@@ -45,34 +70,123 @@ def miesiac_pola(m: dict[str, Any]) -> dict[str, Any]:
             "stale_pelna_kwota": _kwota(m.get("stale_pelna_kwota"))}
 
 
-def zapisz_odczyt(s: Sprawa, dane: dict[str, Any], plik: str) -> None:
-    if dane.get("oczekiwany_wynik"):
-        s.oczekiwany_wynik = dane["oczekiwany_wynik"]  # tylko do porównania, nigdy dane wejściowe
+def _okres_ubezpieczenia(o: dict[str, Any]) -> dict[str, Any] | None:
+    od = _data(o.get("od"))
+    if od is None:
+        return None
+    return {"tytul": o["tytul"], "platnik": o.get("platnik") or "", "platnik_ponad_20": None, "od": od,
+            "do": _data(o.get("do")), "chorobowe": o.get("chorobowe"),
+            "chorobowe_dobrowolne": bool(o.get("chorobowe_dobrowolne"))}
 
-    dokumenty: dict[str, str] = {}  # typ dokumentu → dokument_id w tym pliku
 
-    def dokument_id(typ: str) -> str:
-        if typ not in dokumenty:
-            dokumenty[typ] = s.nowe_id("d")
-        return dokumenty[typ]
+def _ezla(o: dict[str, Any]) -> dict[str, Any] | None:
+    od, do = _data(o.get("od")), _data(o.get("do"))
+    if od is None or do is None:
+        return None
+    return {"od": od, "do": do, "kod": o.get("kod") or None}  # kod tylko, jeśli był widoczny – nie zgadujemy
 
-    for item in dane.get("pola", []):
-        typ = item.get("dokument") or "inne"
-        q = engine.pytanie_dla_pola(item["pole"])
-        w = WartoscPola(wartosc=item["wartosc"], wystawca=WYSTAWCA_DOKUMENTU.get(typ, Wystawca.UZYTKOWNIK),
-                        kanal=Kanal.UPLOAD, zrodlo_opis=f"{typ}, str. {item.get('strona')}",
-                        dokument_id=dokument_id(typ), strona=item.get("strona"),
-                        pewnosc=float(item.get("pewnosc") or 0))
+
+_LISTY = {"miesiace": miesiac_pola, "okresy_ubezpieczenia": _okres_ubezpieczenia, "ezla": _ezla}
+
+
+def _wartosc(pole: str, typ_pola: str, v: Any) -> Any:
+    """Wartość z odczytu → kształt pola w modelu (jak w adapterach źródeł). None = odrzucamy."""
+    if v is None:
+        return None
+    if pole in _LISTY:
+        elementy = [e for e in (_LISTY[pole](x) for x in v or []) if e is not None]
+        return elementy or None
+    if typ_pola == "data":
+        return _data(v)
+    if typ_pola == "liczba":
         try:
-            merge.dodaj(s, _osoba(s, item["pole"], item.get("osoba")), item["pole"], w,
-                        rodzaj=q["rodzaj"] if q else "fakt")
-        except merge.NiedozwolonaWartosc:
-            continue  # np. plan z dokumentu – pomijamy
+            d = Decimal(str(v))
+        except InvalidOperation:
+            return None
+        if pole in POLA_DZIESIETNE:
+            return str(d.quantize(Decimal("0.01")))
+        return int(d) if d == d.to_integral_value() else str(d)
+    if typ_pola == "wielokrotny":
+        return list(v) or None
+    return v
 
-    if dane.get("wynagrodzenia_miesieczne"):
-        # Pole O4 `miesiace[]` (docs/pytania_kalkulator.md) – kwoty jako tekst, dni jako liczby.
-        merge.dodaj(s, _osoba(s, "miesiace", None), "miesiace",
-                    WartoscPola(wartosc=[miesiac_pola(m) for m in dane["wynagrodzenia_miesieczne"]],
-                                wystawca=Wystawca.PRACODAWCA,
-                                kanal=Kanal.UPLOAD, zrodlo_opis=f"Z-3 ({plik})", dokument_id=dokument_id("Z-3"),
-                                pewnosc=1.0))
+
+# ---------- zapis dokumentu ----------
+
+def _wpisy_na_osobe(wpisy: list[dict[str, Any]], lista: bool) -> dict[str | None, dict[str, Any]]:
+    """Kilka wpisów tego samego pola dla tej samej osoby: listy łączymy, z wartości pojedynczych bierzemy
+    najpewniejszą."""
+    wynik: dict[str | None, dict[str, Any]] = {}
+    for w in wpisy:
+        klucz = w.get("osoba")
+        if klucz not in wynik:
+            wynik[klucz] = dict(w)
+        elif lista:
+            stary = wynik[klucz]
+            stary["wartosc"] = list(stary["wartosc"] or []) + list(w["wartosc"] or [])
+            stary["pewnosc"] = min(stary["pewnosc"], w["pewnosc"])
+        elif w["pewnosc"] > wynik[klucz]["pewnosc"]:
+            wynik[klucz] = dict(w)
+    return wynik
+
+
+def zapisz_dokument(s: Sprawa, plik: str, frag: Fragment, odczyt: dict[str, Any] | None) -> Dokument:
+    """Dodaje rozpoznany dokument do sprawy i zapisuje odczytane z niego wartości."""
+    t = TYPY.get(frag.typ, TYPY["inne"])
+    osoba_dok = _osoba_roli(s, frag.osoba) if t.rola == "dane" else None
+    dok = Dokument(id=s.nowe_id("d"), plik=plik, typ=t.kod, typ_opis=t.nazwa, wariant=frag.wariant,
+                   strony=list(frag.strony), osoba_id=osoba_dok.id if osoba_dok else None, wystawca=t.wystawca,
+                   archiwalny=t.archiwalny, rola=t.rola)
+    s.dokumenty.append(dok)
+    if not odczyt:
+        return dok
+
+    def strona_pliku(n: Any) -> int | None:
+        return frag.strony[n - 1] if isinstance(n, int) and 1 <= n <= len(frag.strony) else None
+
+    if t.rola == "decyzja_zus":
+        s.oczekiwany_wynik = odczyt.get("tekst") or None  # tylko do porównania, nigdy dane wejściowe
+        return dok
+    if t.rola == "pismo_zus":
+        dok.informacja = [b for b in odczyt.get("braki") or [] if b]
+        return dok
+
+    prog = prog_pewnosci()
+    for pole, wpisy in odczyt.items():
+        q = engine.pytanie_dla_pola(pole)
+        if q is None or not wpisy:
+            continue
+        for rola, w in _wpisy_na_osobe(wpisy, pole in _LISTY).items():
+            v = _wartosc(pole, q["typ"], w.get("wartosc"))
+            if v is None:
+                continue
+            if pole in POLA_NA_TYTUL:
+                tytul = w.get("tytul") or t.domyslny_tytul
+                if not tytul:
+                    continue
+                v = {tytul: v}
+            strona = strona_pliku(w.get("strona"))
+            pewnosc = max(0.0, min(1.0, float(w.get("pewnosc") or 0)))
+            wp = WartoscPola(wartosc=v, wystawca=t.wystawca, kanal=Kanal.UPLOAD,
+                             zrodlo_opis=f"{t.etykieta}, str. {strona}" if strona else t.etykieta,
+                             dokument_id=dok.id, strona=strona, pewnosc=pewnosc)
+            osoba = _osoba_pola(s, pole, rola or frag.osoba)
+            try:
+                merge.dodaj(s, osoba, pole, wp, rodzaj=q["rodzaj"])
+            except merge.NiedozwolonaWartosc:
+                continue  # np. plan z dokumentu – pomijamy
+            dok.liczba_pol += 1
+            dok.do_sprawdzenia += pewnosc < prog
+    return dok
+
+
+def usun_dokument(s: Sprawa, dokument_id: str) -> bool:
+    """Usuwa dokument i wszystkie wartości z niego odczytane. Decyzja ZUS → czyści `oczekiwany_wynik`."""
+    dok = next((d for d in s.dokumenty if d.id == dokument_id), None)
+    if dok is None:
+        return False
+    merge.usun_dokument(s, dokument_id)
+    s.dokumenty.remove(dok)
+    if dok.rola == "decyzja_zus" and not any(d.rola == "decyzja_zus" for d in s.dokumenty):
+        s.oczekiwany_wynik = None
+    return True

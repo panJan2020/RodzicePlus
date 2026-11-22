@@ -30,7 +30,7 @@ class OkresUbezpieczenia(BaseModel):
     od: date
     do: date | None = None  # None = trwa
     wymiar_etatu: str | None = None
-    chorobowe: bool
+    chorobowe: bool | None = None  # None – nie wiadomo (np. odczyt dokumentu bez tej informacji)
     chorobowe_dobrowolne: bool = False
     aktywny: bool  # czy trwa w dniu `stan_na`
     zrodlo_opis: str = "Konto w ZUS (symulacja)"
