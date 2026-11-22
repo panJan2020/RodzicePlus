@@ -1,0 +1,26 @@
+{
+  "_opis": "Fikcyjny użytkownik do symulacji (mObywatel, ZUS, e-ZLA). Żadnych danych z zestawów ZUS!",
+  "imie": "Marta",
+  "nazwisko": "Przedsiebiorcza",
+  "opis": "Prowadzi działalność gospodarczą, dobrowolne ubezpieczenie chorobowe, ma zaległość w składkach.",
+  "mobywatel": {
+    "data_urodzenia": "1990-11-03"
+  },
+  "zus_konto": {
+    "okresy_ubezpieczenia": [
+      {
+        "tytul": "dzialalnosc",
+        "platnik": "Marta Przedsiebiorcza (własna działalność)",
+        "od": "2025-09-01",
+        "do": null,
+        "chorobowe": true,
+        "chorobowe_dobrowolne": true
+      }
+    ],
+    "podstawa_deklarowana_srednia": "5652.00"
+  },
+  "zus_platnik": {
+    "zadluzenie_kwota": "312.40"
+  },
+  "ezla": []
+}

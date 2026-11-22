@@ -1,4 +1,4 @@
-"""Symulowane logowanie przez mObywatela (FR-01). Bez prawdziwej integracji – zgodnie z treścią zadania.
+"""Symulowane logowanie przez mObywatela (docs/opis_aplikacji.md, rozdz. 9). Bez prawdziwej integracji – zgodnie z treścią zadania.
 
 Przepływ:
   1. GET  /auth/mobywatel/konta  → lista fikcyjnych kont testowych (do wyboru na ekranie logowania),
@@ -8,12 +8,10 @@ Przepływ:
 W produkcji krok 2 zastąpiłoby logowanie OIDC przez węzeł krajowy (login.gov.pl / mObywatel),
 a token byłby podpisanym JWT. Kształt odpowiedzi może zostać ten sam.
 """
-import json
-
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from app.config import MOCKS_FILE
+from app import sources
 
 router = APIRouter(prefix="/auth", tags=["logowanie (symulacja)"])
 
@@ -21,7 +19,7 @@ PREFIKS_TOKENU = "sim-"
 
 
 class LoginRequest(BaseModel):
-    uzytkownik: str  # login konta testowego, np. "anna"
+    login: str  # login konta testowego, np. "anna"
 
 
 class KontoTestowe(BaseModel):
@@ -36,10 +34,11 @@ class Sesja(BaseModel):
     login: str
     imie: str
     nazwisko: str
+    admin: bool = False
 
 
 def _konta() -> dict[str, dict]:
-    return json.loads(MOCKS_FILE.read_text(encoding="utf-8"))["uzytkownicy"]
+    return sources.konta()
 
 
 def login_z_tokenu(token: str | None) -> str:
@@ -63,9 +62,9 @@ def konta_testowe() -> list[KontoTestowe]:
 
 @router.post("/mobywatel", response_model=Sesja)
 def zaloguj(req: LoginRequest) -> Sesja:
-    if req.uzytkownik not in _konta():
+    if req.login not in _konta():
         raise HTTPException(404, "Nie ma takiego konta testowego.")
-    return _sesja(req.uzytkownik)
+    return _sesja(req.login)
 
 
 @router.get("/ja", response_model=Sesja)

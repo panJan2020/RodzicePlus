@@ -1,4 +1,4 @@
-"""Treści informacyjne: dokumenty i terminy (FR-19..21), ryzyka (FR-22..23), wsparcie (FR-24), linki (FR-27).
+"""Treści informacyjne: dokumenty i terminy, ryzyka, wsparcie, linki (docs/opis_aplikacji.md, rozdz. 8).
 
 Treści trzymajcie w plikach JSON/Markdown w app/content (TODO), żeby nie-programiści mogli je edytować.
 """

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config
-from app.api import admin, auth, info, kalkulator, sprawy, zus
+from app.api import admin, auth, info, sprawy, swiadczenia, zadania, zrodla
 
 app = FastAPI(title="Zasiłkowy Przewodnik Przyszłego Rodzica – API", version="0.1.0")
 
@@ -15,7 +15,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth.router, zus.router, sprawy.router, kalkulator.router, info.router, admin.router):
+for r in (auth.router, sprawy.router, zrodla.router, swiadczenia.router, zadania.router, info.router,
+          admin.router):
     app.include_router(r)
 
 

@@ -11,7 +11,7 @@ import '../../shared/widgets/tresc_strony.dart';
 import 'kalkulator_viewmodel.dart';
 
 /// „Kalkulator” – czy świadczenie przysługuje (z uzasadnieniem) i ile wynosi.
-/// Komputer: dwie kolumny (uprawnienia | okresy i kwoty); telefon: jedna pod drugą.
+/// Komputer: dwie kolumny (świadczenia | okresy i kwoty); telefon: jedna pod drugą.
 class KalkulatorView extends StatelessWidget {
   const KalkulatorView({super.key});
 
@@ -47,7 +47,7 @@ class _Tresc extends StatelessWidget {
               children: [
                 Semantics(header: true, child: Text('Czy Ci przysługuje', style: t.titleLarge)),
                 const SizedBox(height: 12),
-                for (final u in vm.uprawnienia) ...[_KartaUprawnienia(wynik: u), const SizedBox(height: 12)],
+                for (final u in vm.swiadczenia) ...[_KartaSwiadczenia(wynik: u), const SizedBox(height: 12)],
               ],
             );
             final prawa = Column(
@@ -75,12 +75,6 @@ class _Tresc extends StatelessWidget {
   }
 }
 
-String _nazwaSwiadczenia(String s) => switch (s) {
-      'zasilek_macierzynski' => 'Zasiłek macierzyński',
-      'zasilek_chorobowy_ciaza' => 'Zasiłek chorobowy w ciąży',
-      _ => s.replaceAll('_', ' '),
-    };
-
 String _nazwaOkresu(String s) => switch (s) {
       'macierzynski' => 'Urlop macierzyński',
       'rodzicielski' => 'Urlop rodzicielski',
@@ -89,18 +83,19 @@ String _nazwaOkresu(String s) => switch (s) {
       _ => s.replaceAll('_', ' '),
     };
 
-class _KartaUprawnienia extends StatelessWidget {
-  const _KartaUprawnienia({required this.wynik});
-  final WynikUprawnienia wynik;
+class _KartaSwiadczenia extends StatelessWidget {
+  const _KartaSwiadczenia({required this.wynik});
+  final WynikSwiadczenia wynik;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final w = wynik;
     final (kolor, tlo, ikona, napis) = switch (w.status) {
-      StatusUprawnienia.przysluguje => (Kolory.primary, Kolory.primaryLight, Icons.check_circle, 'Przysługuje'),
-      StatusUprawnienia.niePrzysluguje => (Kolory.blad, Kolory.bladTlo, Icons.cancel, 'Nie przysługuje'),
-      StatusUprawnienia.brakDanych => (Kolory.ostrzezenie, Kolory.ostrzezenieTlo, Icons.help, 'Brakuje danych'),
+      StatusSwiadczenia.przysluguje => (Kolory.primary, Kolory.primaryLight, Icons.check_circle, 'Przysługuje'),
+      StatusSwiadczenia.warunkowo => (Kolory.secondary, Kolory.tlo, Icons.schedule, 'Przysługuje warunkowo'),
+      StatusSwiadczenia.niePrzysluguje => (Kolory.blad, Kolory.bladTlo, Icons.cancel, 'Nie przysługuje'),
+      StatusSwiadczenia.brakDanych => (Kolory.ostrzezenie, Kolory.ostrzezenieTlo, Icons.help, 'Brakuje danych'),
     };
 
     return Card(
@@ -111,7 +106,7 @@ class _KartaUprawnienia extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_nazwaSwiadczenia(w.swiadczenie), style: t.titleMedium),
+            Text(w.nazwa, style: t.titleMedium),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -127,11 +122,11 @@ class _KartaUprawnienia extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             for (final u in w.uzasadnienie) Text(u, style: t.bodyLarge),
-            if (w.ktoWyplaca != null) ...[
+            if (w.ktoWyplacaOpis != null) ...[
               const SizedBox(height: 8),
-              Text('Kto wypłaca: ${w.ktoWyplaca}', style: t.bodyLarge),
+              Text(w.ktoWyplacaOpis!, style: t.bodyLarge),
             ],
-            if (w.status == StatusUprawnienia.brakDanych && w.brakujacePytania.isNotEmpty) ...[
+            if (w.status == StatusSwiadczenia.brakDanych && w.brakujacePola.isNotEmpty) ...[
               const SizedBox(height: 12),
               _Brakujace(wynik: w),
             ],
@@ -149,12 +144,12 @@ class _KartaUprawnienia extends StatelessWidget {
 /// „Brakuje N odpowiedzi:” + lista pytań + „Uzupełnij” → `/dane?pytanie=<pierwsze ID>`.
 class _Brakujace extends StatelessWidget {
   const _Brakujace({required this.wynik});
-  final WynikUprawnienia wynik;
+  final WynikSwiadczenia wynik;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final braki = wynik.brakujacePytania;
+    final braki = wynik.brakujacePola;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -174,7 +169,7 @@ class _Brakujace extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${b.tresc} (${b.id})', style: t.bodyLarge),
+                      Text('${b.tresc} (${b.pytanieId})', style: t.bodyLarge),
                       if (b.gdzieZnalezc != null) Text('Znajdziesz to: ${b.gdzieZnalezc}', style: t.bodyMedium),
                     ],
                   ),
@@ -184,7 +179,7 @@ class _Brakujace extends StatelessWidget {
           ),
         const SizedBox(height: 8),
         FilledButton.icon(
-          onPressed: () => context.go(Uri(path: '/dane', queryParameters: {'pytanie': braki.first.id}).toString()),
+          onPressed: () => context.go(Uri(path: '/dane', queryParameters: {'pytanie': braki.first.pytanieId}).toString()),
           icon: const Icon(Icons.edit),
           label: const Text('Uzupełnij'),
         ),
@@ -200,6 +195,7 @@ class _Kwoty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final ty = wynik.osoby.isEmpty ? null : wynik.osoby.first;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -209,8 +205,10 @@ class _Kwoty extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Podstawa wymiaru zasiłku', style: t.bodyMedium),
-                Text(formatujKwote(wynik.podstawaWymiaru), style: t.titleLarge),
+                if (ty != null) ...[
+                  Text('Podstawa wymiaru zasiłku', style: t.bodyMedium),
+                  Text(formatujKwote(ty.podstawaWymiaru), style: t.titleLarge),
+                ],
                 const SizedBox(height: 8),
                 Text('Razem za wszystkie okresy (brutto)', style: t.bodyMedium),
                 Text(formatujKwote(wynik.suma), style: t.titleLarge?.copyWith(color: Kolory.primaryDark)),
@@ -227,7 +225,9 @@ class _Kwoty extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(_nazwaOkresu(o.rodzaj), style: t.titleMedium),
-                  Text('${formatujDate(o.odDnia)} – ${formatujDate(o.doDnia)} · ${o.osoba}', style: t.bodyMedium),
+                  Text('${formatujDate(o.odDnia)} – ${formatujDate(o.doDnia)} · ${o.tygodnie} tyg. · '
+                      '${o.osobaId != null && o.osobaId == ty?.osobaId ? 'Ty' : 'drugi rodzic'}',
+                      style: t.bodyMedium),
                   const SizedBox(height: 8),
                   Text('${formatujProcent(o.stawka)} podstawy · ${formatujKwote(o.kwotaMiesieczna)} miesięcznie (brutto)',
                       style: t.bodyLarge),
@@ -240,7 +240,7 @@ class _Kwoty extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        Text('Parametry prawne: ${wynik.wersjaParametrow}', style: t.bodyMedium),
+        Text('Parametry prawne obowiązujące od ${formatujDateIso(wynik.wersjaParametrow)}', style: t.bodyMedium),
       ],
     );
   }

@@ -1,4 +1,4 @@
-// FR-01 – symulowane logowanie mObywatel: test całego przepływu z fałszywym serwerem.
+// Symulowane logowanie mObywatel: test całego przepływu z fałszywym serwerem.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

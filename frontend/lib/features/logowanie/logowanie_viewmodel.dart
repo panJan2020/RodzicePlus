@@ -4,7 +4,7 @@ import '../../data/api_client.dart';
 import '../../data/models/modele.dart';
 import '../../data/repositories/auth_repository.dart';
 
-/// Ekran symulowanego logowania mObywatel (FR-01).
+/// Ekran symulowanego logowania mObywatel.
 class LogowanieViewModel extends ChangeNotifier {
   LogowanieViewModel(this._repo) {
     zaladuj();

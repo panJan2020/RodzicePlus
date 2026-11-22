@@ -54,7 +54,19 @@ def test_podwyzszenie_do_swiadczenia_rodzicielskiego_art31_3a():
 
 
 def test_plan_matki_81_5_pomija_9_tyg_drugiego_rodzica():
-    okresy = timeline.plan_matki(date(2026, 3, 2), 1, False, "jednolity_81_5", Decimal("6000"), P)
+    okresy = timeline.plan_matki(date(2026, 3, 2), 1, False, True, Decimal("6000"), P)
     assert [o.rodzaj for o in okresy] == ["macierzynski", "rodzicielski"]
     assert (okresy[1].do - okresy[0].od).days + 1 == (20 + 32) * 7
-    assert all(o.stawka == 0.815 for o in okresy)
+    assert all(o.stawka == "0.815" for o in okresy)
+
+
+@pytest.mark.parametrize("stawka,tekst", [(1.0, "1.00"), (0.7, "0.70"), (0.815, "0.815")])
+def test_stawka_jako_tekst(stawka, tekst):
+    assert timeline.stawka_tekst(stawka) == tekst
+
+
+@pytest.mark.parametrize("wniosek,wynik", [("2026-07-31", True), ("2026-08-01", False), ("2026-06-20", True), (None, False)])
+def test_scenariusz_domyslny_wniosek_81_5_w_terminie_art31(wniosek, wynik):
+    from app.calculator import scenariusz
+    fakty = {"data_porodu": "2026-07-10", "wniosek_81_5_data": wniosek}
+    assert scenariusz.domyslny(fakty, P) == {"wniosek_81_5": wynik}

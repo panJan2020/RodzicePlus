@@ -2,22 +2,24 @@ import '../../core/session.dart';
 import '../api_client.dart';
 import '../models/modele.dart';
 
-/// Sprawa = profil danych użytkownika (Sprawa → Osoba → pola).
-/// Zakładka „Dane”, kreator, uprawnienia i kalkulator korzystają z tej samej sprawy.
+/// Sprawa = profil danych (Sprawa → Osoby → Pola → wartości z różnych źródeł).
+/// „Moje dane”, „Moje ubezpieczenie” i kalkulator korzystają z tej samej, bieżącej sprawy.
 class SprawaRepository {
   SprawaRepository(this._api, this._sesja);
 
   final ApiClient _api;
   final SesjaAplikacji _sesja;
 
-  /// Id bieżącej sprawy – tworzy nową, jeśli jeszcze jej nie ma.
+  /// Źródła, z których pobieramy dane po kliknięciu „Pobierz z ZUS” (symulacja – docs/api.md 2.4).
+  static const zrodlaZus = ['zus_konto', 'zus_platnik', 'ezla'];
+
+  /// Id bieżącej sprawy – tworzy nową, jeśli jeszcze jej nie ma (anonimową albo zalogowanej osoby).
   Future<String> biezacaSprawa() async {
     final istniejaca = _sesja.sprawaId;
     if (istniejaca != null) return istniejaca;
-    final s = await _api.post('/sprawy') as Map<String, dynamic>;
-    final id = s['id'] as String;
-    _sesja.ustawSprawe(id);
-    return id;
+    final s = Sprawa.fromJson(await _api.post('/sprawy') as Map<String, dynamic>);
+    _sesja.ustawSprawe(s.id);
+    return s.id;
   }
 
   /// Wykonuje zapytanie dla bieżącej sprawy. Gdy serwer jej nie zna (np. restart darmowego
@@ -33,26 +35,57 @@ class SprawaRepository {
     }
   }
 
-  /// Całe drzewo pytań jednej osoby (zakładka „Dane”).
-  Future<DaneOsoby> dane({int osoba = 0}) => _wSprawie(
-        (id) async => DaneOsoby.fromJson(await _api.get('/sprawy/$id/dane?osoba=$osoba') as Map<String, dynamic>),
+  static String _osoba(String? osoba) => osoba == null ? '' : '?osoba=$osoba';
+
+  Future<Sprawa> sprawa() =>
+      _wSprawie((id) async => Sprawa.fromJson(await _api.get('/sprawy/$id') as Map<String, dynamic>));
+
+  /// Wszystkie pytania jednej osoby („Moje dane”). `osoba == null` – wnioskodawca.
+  Future<DaneOsoby> dane({String? osoba}) => _wSprawie(
+        (id) async => DaneOsoby.fromJson(await _api.get('/sprawy/$id/dane${_osoba(osoba)}') as Map<String, dynamic>),
       );
 
-  /// Zapisuje odpowiedź użytkownika. `wartosc == null` czyści odpowiedź.
-  Future<void> zapiszOdpowiedz(String pole, Object? wartosc, {int osoba = 0}) => _wSprawie(
-        (id) => _api.post('/sprawy/$id/odpowiedzi', [
-          {'pole': pole, 'wartosc': wartosc, 'osoba': osoba},
-        ]),
+  /// Zapisuje odpowiedź użytkownika. `wartosc == null` usuwa tylko odpowiedź użytkownika.
+  Future<ZmianaDanych> zapiszOdpowiedz(String pole, Object? wartosc, {String? osoba}) => _wSprawie(
+        (id) async => ZmianaDanych.fromJson(await _api.post('/sprawy/$id/odpowiedzi', [
+          {'osoba': osoba, 'pole': pole, 'wartosc': wartosc},
+        ]) as Map<String, dynamic>),
       );
 
-  Future<List<WynikUprawnienia>> uprawnienia({int osoba = 0}) => _wSprawie((id) async {
-        final lista = await _api.get('/sprawy/$id/uprawnienia?osoba=$osoba') as List<dynamic>;
-        return [for (final w in lista) WynikUprawnienia.fromJson(w as Map<String, dynamic>)];
+  /// Pobiera dane z jednego źródła (symulacja). Wymaga zalogowania.
+  Future<ZmianaDanych> pobierzZrodlo(String kod) => _wSprawie(
+        (id) async => ZmianaDanych.fromJson(await _api.post('/sprawy/$id/zrodla/$kod/pobierz') as Map<String, dynamic>),
+      );
+
+  /// „Pobierz z ZUS”: konto ubezpieczonego, dane płatnika, e-ZLA. Zwraca wynik ostatniego pobrania.
+  Future<ZmianaDanych> pobierzZZus() async {
+    ZmianaDanych? ostatnia;
+    var dodano = 0;
+    for (final kod in zrodlaZus) {
+      ostatnia = await pobierzZrodlo(kod);
+      dodano += ostatnia.dodano;
+    }
+    return ZmianaDanych(
+      dodano: dodano,
+      zmienionoAktywne: ostatnia!.zmienionoAktywne,
+      noweKonflikty: ostatnia.noweKonflikty,
+      liczniki: ostatnia.liczniki,
+      wynikiNieaktualne: ostatnia.wynikiNieaktualne,
+    );
+  }
+
+  /// Stan ubezpieczenia z danych sprawy. `404`, gdy dane z ZUS nie zostały jeszcze pobrane.
+  Future<DaneUbezpieczenia> ubezpieczenie() => _wSprawie(
+        (id) async => DaneUbezpieczenia.fromJson(await _api.get('/sprawy/$id/ubezpieczenie') as Map<String, dynamic>),
+      );
+
+  Future<List<WynikSwiadczenia>> swiadczenia() => _wSprawie((id) async {
+        final lista = await _api.get('/sprawy/$id/swiadczenia') as List<dynamic>;
+        return [for (final w in lista) WynikSwiadczenia.fromJson(w as Map<String, dynamic>)];
       });
 
   /// Wynik kalkulatora. Rzuca [ApiException] z kodem 422 i komunikatem, gdy brakuje danych.
-  Future<WynikKalkulatora> kalkulator({int osoba = 0}) => _wSprawie(
-        (id) async =>
-            WynikKalkulatora.fromJson(await _api.get('/sprawy/$id/kalkulator?osoba=$osoba') as Map<String, dynamic>),
+  Future<WynikKalkulatora> kalkulator() => _wSprawie(
+        (id) async => WynikKalkulatora.fromJson(await _api.get('/sprawy/$id/kalkulator') as Map<String, dynamic>),
       );
 }

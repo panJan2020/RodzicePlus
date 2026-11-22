@@ -11,7 +11,8 @@ import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import 'dane_viewmodel.dart';
 
-/// Zakładka „Moje dane” (FR-03): wszystkie pytania z katalogu jako drzewo zależności.
+/// Zakładka „Moje dane”: wszystkie pytania z katalogu jako drzewo zależności, osobno dla każdej osoby w sprawie.
+/// Przy każdej odpowiedzi pokazujemy aktywną wartość i jej źródło („Skąd to wiemy”).
 /// Telefon i tablet – sekcje jako rozwijane karty; komputer – sekcje po lewej, pytania po prawej.
 /// Głęboki link: `/dane?pytanie=B5` rozwija sekcję, przewija do pytania i je wyróżnia.
 class DaneView extends StatelessWidget {
@@ -23,7 +24,7 @@ class DaneView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       key: ValueKey(pytanie), // nowy link → nowy stan ekranu
-      create: (c) => DaneViewModel(c.read(), c.read(), pytanie: pytanie),
+      create: (c) => DaneViewModel(c.read(), pytanie: pytanie),
       child: const _Tresc(),
     );
   }
@@ -123,6 +124,10 @@ class _Naglowek extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (vm.osoby.length > 1) ...[
+              _WyborOsoby(vm: vm),
+              const SizedBox(height: 16),
+            ],
             Text('Odpowiedziano na ${postep.odpowiedziane} z ${postep.aktywne} pytań', style: t.titleMedium),
             const SizedBox(height: 8),
             LinearProgressIndicator(
@@ -132,7 +137,7 @@ class _Naglowek extends StatelessWidget {
               backgroundColor: Kolory.primaryLight,
               semanticsLabel: 'Postęp odpowiedzi: ${postep.odpowiedziane} z ${postep.aktywne}',
             ),
-            if (zalogowany) ...[
+            if (zalogowany && vm.wybranyWnioskodawca) ...[
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerLeft,
@@ -155,6 +160,41 @@ class _Naglowek extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Czyje dane oglądamy: Ty, dziecko, drugi rodzic.
+class _WyborOsoby extends StatelessWidget {
+  const _WyborOsoby({required this.vm});
+  final DaneViewModel vm;
+
+  static String _etykieta(OsobaSprawy o, bool pierwsza) => switch (o.rola) {
+        _ when pierwsza => o.imie == null ? 'Ty' : 'Ty (${o.imie})',
+        RolaOsoby.dziecko => o.imie ?? 'Dziecko',
+        RolaOsoby.matka => o.imie ?? 'Matka',
+        RolaOsoby.ojciec => o.imie ?? 'Ojciec',
+        RolaOsoby.drugiRodzic => o.imie ?? 'Drugi rodzic',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final wybrana = vm.osobaId ?? vm.osoby.first.id;
+    return Semantics(
+      label: 'Czyje dane pokazać',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final (i, o) in vm.osoby.indexed)
+            ChoiceChip(
+              label: Text(_etykieta(o, i == 0)),
+              selected: o.id == wybrana,
+              onSelected: (_) => vm.wybierzOsobe(o.id),
+              materialTapTargetSize: MaterialTapTargetSize.padded,
+            ),
+        ],
       ),
     );
   }
@@ -447,11 +487,28 @@ class _KartaPytania extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(_ikonaZrodla(w.zrodlo), size: 16, color: Kolory.tekstDrugorzedny),
+                  Icon(_ikonaZrodla(w.wystawca), size: 16, color: Kolory.tekstDrugorzedny),
                   const SizedBox(width: 6),
-                  Flexible(child: Text(opisZrodla(w), style: t.bodyMedium)),
+                  Flexible(child: Text(opisZrodla(p, w), style: t.bodyMedium)),
                 ],
               ),
+              if (p.konflikt) ...[
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.compare_arrows, size: 18, color: Kolory.secondary, semanticLabel: 'Różne źródła'),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Mamy też inną wartość z innego źródła (${p.wartosci.length - 1}). '
+                        'Do wyliczeń używamy tej powyżej.',
+                        style: t.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (p.doSprawdzenia) ...[
                 const SizedBox(height: 8),
                 const Row(
@@ -488,15 +545,17 @@ class _KartaPytania extends StatelessWidget {
                   )
                 : FilledButton.icon(onPressed: onZmien, icon: const Icon(Icons.edit), label: const Text('Odpowiedz'))
       else
-        Text('Tylko do podglądu – dane z systemu e-ZLA.', style: t.bodyMedium),
+        Text('Tylko do podglądu – te dane pobieramy z systemów albo z dokumentów.', style: t.bodyMedium),
     ];
   }
 
-  static IconData _ikonaZrodla(ZrodloWartosci z) => switch (z) {
-        ZrodloWartosci.uzytkownik => Icons.person_outline,
-        ZrodloWartosci.zus => Icons.account_balance_outlined,
-        ZrodloWartosci.dokument => Icons.description_outlined,
-        ZrodloWartosci.wyliczone => Icons.calculate_outlined,
+  static IconData _ikonaZrodla(Wystawca z) => switch (z) {
+        Wystawca.uzytkownik => Icons.person_outline,
+        Wystawca.zus || Wystawca.urzad => Icons.account_balance_outlined,
+        Wystawca.sad => Icons.gavel_outlined,
+        Wystawca.pracodawca => Icons.business_outlined,
+        Wystawca.lekarz => Icons.medical_services_outlined,
+        Wystawca.wyliczone => Icons.calculate_outlined,
       };
 }
 

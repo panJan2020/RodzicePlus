@@ -1,0 +1,93 @@
+"""Wyniki świadczeń i kalkulator dla sprawy (docs/api.md 2.8–2.9).
+
+Na razie: jedna reguła (zasiłek macierzyński) i scenariusz domyślny budowany z faktów.
+Scenariusze, porównanie i POST /kalkulator – etap 4.
+"""
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.wspolne import login_opcjonalny, osoba_lub_404, sprawa_lub_404
+from app.calculator import podstawa as pw
+from app.calculator import scenariusz, timeline
+from app.domain.model import ROLE_RODZICA, Rola, Sprawa
+from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulatora, WynikKalkulatora,
+                                WynikSwiadczenia)
+from app.params.store import get_params
+from app.questions import engine
+from app.rules import eligibility
+
+router = APIRouter(prefix="/sprawy/{sprawa_id}", tags=["świadczenia i kalkulator"])
+
+
+def _brakujace(s: Sprawa, osoba, pola: list[str]) -> list[BrakujacePole]:
+    """Nazwy pól → pytania, na które da się odpowiedzieć teraz (zablokowane → pytanie nadrzędne)."""
+    wynik = []
+    for id_ in engine.pytania_do_uzupelnienia(s, osoba, pola):
+        q = engine.pytanie(id_)
+        if q:
+            wynik.append(BrakujacePole(pytanie_id=id_, tresc=q["tresc"], gdzie_znalezc=q.get("gdzie_znalezc")))
+    return wynik
+
+
+@router.get("/swiadczenia", response_model=list[WynikSwiadczenia])
+def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -> list[WynikSwiadczenia]:
+    """Wyniki wszystkich reguł dla każdego rodzica w sprawie."""
+    s = sprawa_lub_404(sprawa_id, login)
+    p = get_params()
+    wyniki = []
+    for o in (x for x in s.osoby if x.rola in ROLE_RODZICA):
+        fakty = engine.fakty(s, o)
+        for regula in eligibility.REGULY.values():
+            r = regula(fakty, p)
+            wyniki.append(WynikSwiadczenia(
+                **r.model_dump(exclude={"brakujace"}), osoba_id=o.id,
+                brakujace_pola=_brakujace(s, o, r.brakujace), wersja_parametrow=p["obowiazuje_od"]))
+    return wyniki
+
+
+def _podstawa(f: dict, p: dict) -> Decimal:
+    tytuly = f.get("tytuly") or []
+    if "umowa_o_prace" in tytuly and f.get("srednie_wynagrodzenie_brutto"):
+        # Tryb uproszczony (O4s). Pełny tryb z miesięcy (Z-3) – etap 2.
+        m = pw.MiesiacWynagrodzenia(skladniki_stale=float(Decimal(f["srednie_wynagrodzenie_brutto"])))
+        pelny_etat = Decimal(str(f.get("etat") or "1")) >= 1
+        return pw.podstawa_pracownik([m], pelny_etat=pelny_etat, p=p)
+    if f.get("podstawa_deklarowana_srednia"):
+        return pw.podstawa_dobrowolne([float(Decimal(f["podstawa_deklarowana_srednia"]))], p)
+    raise HTTPException(422, "Aby policzyć kwotę, podaj średnie wynagrodzenie albo podstawę składek "
+                             "(pytania O4s, Q1s).")
+
+
+@router.get("/kalkulator", response_model=WynikKalkulatora)
+def kalkulator(sprawa_id: str, osoba: str | None = None,
+               login: str | None = Depends(login_opcjonalny)) -> WynikKalkulatora:
+    s = sprawa_lub_404(sprawa_id, login)
+    matka = osoba_lub_404(s, osoba)
+    f = engine.fakty(s, matka)
+    dziecko = next((o for o in s.osoby if o.rola == Rola.DZIECKO), None)
+    fd = engine.fakty(s, dziecko) if dziecko else {}
+    wnioskodawca = engine.fakty(s, s.wnioskodawca())
+
+    data_porodu = scenariusz.data_zdarzenia(f)
+    if data_porodu is None:
+        raise HTTPException(422, "Aby policzyć zasiłek, podaj datę porodu albo przewidywaną datę porodu "
+                                 "(pytania G1, G2).")
+    p = get_params(data_porodu)
+    podstawa = _podstawa(f, p)
+    wybory = scenariusz.domyslny(f, p)
+
+    okresy = timeline.plan_matki(
+        data_porodu=data_porodu, liczba_dzieci=int(f.get("liczba_dzieci") or 1),
+        za_zyciem=bool(fd.get("za_zyciem", False)), wniosek_81_5=wybory["wniosek_81_5"],
+        podstawa=podstawa, p=p, drugi_rodzic_bierze_9_tyg=wnioskodawca.get("drugi_rodzic_aktywny") == "tak")
+    drugi = next((o for o in s.osoby if o.rola in (Rola.OJCIEC, Rola.DRUGI_RODZIC) and o is not matka), None)
+    wynik_okresy = [OkresKalkulatora(**o.model_dump(exclude={"osoba"}),
+                                     osoba_id=matka.id if o.osoba == "matka" else (drugi.id if drugi else None))
+                    for o in okresy]
+    suma_matki = sum((Decimal(o.kwota_za_okres) for o in okresy if o.osoba == "matka"), Decimal("0"))
+    suma = sum((Decimal(o.kwota_za_okres) for o in okresy), Decimal("0"))
+    return WynikKalkulatora(scenariusz_id=scenariusz.SCENARIUSZ_DOMYSLNY, wersja_parametrow=p["obowiazuje_od"],
+                            osoby=[OsobaKalkulatora(osoba_id=matka.id, podstawa_wymiaru=str(podstawa),
+                                                    suma=str(suma_matki))],
+                            okresy=wynik_okresy, suma=str(suma))

@@ -19,7 +19,9 @@
 | Admin | dodatkowo nagłówek `X-Admin-Token` |
 | Błędy | `{"detail": "Komunikat po polsku dla użytkownika"}`; kody: `400` złe dane, `401` brak/zły token, `403` brak uprawnień, `404` nie ma zasobu, `409` konflikt wersji, `413` za duży plik, `422` walidacja |
 | Teksty | wszystkie teksty dla użytkownika gotowe do wyświetlenia (Flutter niczego nie składa ani nie liczy) |
-| Osoba | identyfikowana przez `osoba_id` (np. `"o1"`); rola w danych osoby |
+| Osoba | identyfikowana przez `osoba_id` (np. `"o1"`); rola w danych osoby. Parametr `osoba` pominięty = wnioskodawca (osoba zalogowana albo `o1`) |
+| Liczby w wartościach pól | kwoty i ułamki (np. `etat`) jako tekst (`"0.50"`), liczby całkowite (dni, liczba dzieci) jako liczby; pola „na tytuł” jako słownik `{tytul: wartość}` |
+| Stan wdrożenia | backend zwraca **podzbiór** pól opisanych niżej – pola, których jeszcze nie liczymy, dochodzą razem z regułami; nazwy i typy zawsze zgodne z tym plikiem |
 
 ---
 
@@ -44,13 +46,18 @@
 | POST | `/sprawy/{id}/osoby` | `{"rola": "ojciec" \| "drugi_rodzic" \| "dziecko", "imie": "..."}` → `Osoba` | 2.1 |
 | DELETE | `/sprawy/{id}/osoby/{osoba_id}` | usuwa osobę (nie można usunąć zalogowanej) | 2.1 |
 
+**Sprawy anonimowe są dozwolone.** `POST /sprawy` bez nagłówka `Authorization` tworzy sprawę z osobą `o1`
+(`rola: matka`, `zalogowana: false`) – można wypełniać „Moje dane” i liczyć wyniki bez logowania. Z nagłówkiem
+sprawa należy do zalogowanej osoby (`o1` = ona, `zalogowana: true`) i jest dostępna tylko z jej tokenem (`403` dla innych).
+Przy `zdarzenie: "urodzenie"` od razu dodajemy osobę `o2` (`rola: dziecko`). Źródła symulowane (2.4) wymagają logowania.
+
 ### 2.3. Dane, kreator, wybór źródła
 
 | Metoda | Ścieżka | Opis | Opis app |
 |---|---|---|---|
 | GET | `/sprawy/{id}/dane?osoba=o1` | `DaneOsoby` – wszystkie pytania w sekcjach, z wartościami ze wszystkich źródeł | 2, ekran 3 |
 | GET | `/sprawy/{id}/pytania?osoba=o1` | kreator: pytania **aktywne bez aktywnej wartości** → `[Pytanie]` | 2.2 |
-| POST | `/sprawy/{id}/odpowiedzi` | `[{"osoba": "o1", "pole": "pdp", "wartosc": "2026-12-20"}]` – dodaje/zmienia wartość **użytkownika**; `wartosc: null` usuwa tylko wartość użytkownika (wartości z innych źródeł zostają) → `ZmianaDanych` | 2.2, 4 |
+| POST | `/sprawy/{id}/odpowiedzi` | `[{"osoba": "o1", "pole": "pdp", "wartosc": "2026-12-20"}]` – dodaje/zmienia wartość **użytkownika**; `wartosc: null` usuwa tylko wartość użytkownika (wartości z innych źródeł zostają) → `ZmianaDanych`. Jeśli pole ma już wartość z innego źródła, odpowiedź użytkownika jest **świadomą edycją**: staje się aktywna z wyborem ręcznym (`wybor_aktywnej: uzytkownik`), a tamta wartość zostaje i konflikt jest widoczny. `400` – pole nieznane, nie dotyczy osoby albo jest tylko do podglądu; `422` – wartość nie pasuje do typu | 2.2, 4 |
 | PUT | `/sprawy/{id}/osoby/{osoba_id}/pola/{pole}/aktywna` | `{"wartosc_id": "w2"}` – użytkownik wybiera źródło pola; `{"wartosc_id": null}` przywraca wybór automatyczny → `ZmianaDanych` | 4.1 |
 
 ### 2.4. Źródła danych
@@ -58,7 +65,7 @@
 | Metoda | Ścieżka | Opis | Opis app |
 |---|---|---|---|
 | GET | `/zrodla` | lista źródeł → `[{kod, nazwa, wystawca, opis, symulacja: true}]` | 3 |
-| POST | `/sprawy/{id}/zrodla/{kod}/pobierz` | `{"osoba": "o1"}` – pobiera dane ze źródła (`mobywatel`, `rsc`, `zus_konto`, `zus_platnik`, `zus_historia`, `ezla`, `pue`); **dodaje** wartości, aktywną wybiera hierarchia → `ZmianaDanych` | 3 |
+| POST | `/sprawy/{id}/zrodla/{kod}/pobierz` | `{"osoba": "o1"}` – pobiera dane ze źródła (`mobywatel`, `rsc`, `zus_konto`, `zus_platnik`, `zus_historia`, `ezla`, `pue`); **dodaje** wartości (ponowne pobranie aktualizuje wartość z tego źródła, nie dubluje jej), aktywną wybiera hierarchia → `ZmianaDanych`. Wymaga logowania (`401`); tylko dla osoby zalogowanej w tej sprawie (`403`); body opcjonalne (domyślnie osoba zalogowana) | 3 |
 
 ### 2.5. Konflikty i niespójności
 
@@ -84,7 +91,7 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
 
 | Metoda | Ścieżka | Opis | Opis app |
 |---|---|---|---|
-| GET | `/sprawy/{id}/ubezpieczenie?osoba=o1&na_dzien=RRRR-MM-DD` | `DaneUbezpieczenia` (na podstawie aktywnych wartości; `na_dzien` domyślnie dziś) | 9, ekran 6 |
+| GET | `/sprawy/{id}/ubezpieczenie?osoba=o1&na_dzien=RRRR-MM-DD` | `DaneUbezpieczenia` (na podstawie aktywnej wartości pola `okresy_ubezpieczenia`; `na_dzien` domyślnie dziś); `404`, gdy sprawa nie ma jeszcze okresów ubezpieczenia (najpierw pobierz `zus_konto`) | 9, ekran 6 |
 | GET | `/sprawy/{id}/ezla?osoba=o1` | `[ZwolnienieEzla]` | 9, ekran 6 |
 | POST | `/sprawy/{id}/zaswiadczenie-zadluzenie` | `{"osoba": "o1", "na_dzien": "2026-12-30"}` → `ZaswiadczenieZadluzenie` | 9, ekran 6 |
 | GET | `/sprawy/{id}/zaswiadczenie-zadluzenie/{zid}/pdf` | PDF zaświadczenia (symulacja) | 9 |
@@ -106,7 +113,7 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
 | POST | `/sprawy/{id}/scenariusze` | `{"nazwa": "...", "wybory": {...}}` → `Scenariusz` | 2.3 |
 | PUT | `/sprawy/{id}/scenariusze/{sid}` | zmiana nazwy lub wyborów → `Scenariusz` | 2.3 |
 | DELETE | `/sprawy/{id}/scenariusze/{sid}` | usuwa (nie domyślny) | 2.3 |
-| GET | `/sprawy/{id}/kalkulator?scenariusz=s1` | `WynikKalkulatora` dla sprawy | 7 |
+| GET | `/sprawy/{id}/kalkulator?scenariusz=s1` | `WynikKalkulatora` dla sprawy. Do czasu scenariuszy (etap 4) liczony jest tylko scenariusz domyślny (`scenariusz_id: "domyslny"`), budowany z faktów: `wniosek_81_5 = true`, gdy `wniosek_81_5_data` mieści się w terminie z parametru `wniosek_jednolita_dni` od porodu | 7 |
 | GET | `/sprawy/{id}/kalkulator/porownanie?scenariusze=s1,s2` | `[WynikKalkulatora]` + `roznice` | 7 |
 
 ### 2.10. Informacje
@@ -191,7 +198,11 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "typ": "data",                   // wybor | wielokrotny | tak_nie | liczba | kwota | data | okresy
  "opcje": [],                     // dla wybor / wielokrotny: [{"wartosc": "...", "etykieta": "..."}]
  "pomoc": "…", "gdzie_znalezc": "zaświadczenie lekarskie o przewidywanej dacie porodu",
- "rodzaj": "fakt",                // fakt | plan (plany tylko od użytkownika)
+ "rodzaj": "fakt",                // fakt | plan (plany tylko od użytkownika) | wyliczone
+ "edytowalne": true,              // false: tylko podgląd (np. e-ZLA, okresy ubezpieczenia) albo brak kreatora w źródłach
+ "na_tytul": false,               // true: wartość to słownik {tytul: odpowiedź}
+ "klucze": [],                    // pola „na tytuł” (B4, C1): [{"wartosc": "umowa_o_prace", "etykieta": "Umowa o pracę"}] –
+                                  // wartość pola to słownik {"umowa_o_prace": "ponad_20", ...}
  "status": "aktywne",             // aktywne | zablokowane (czeka_na) | wykluczone (wartość zostaje, reguły jej nie używają)
  "czeka_na": [],
  "wartosci": [ /* WartoscPola */ ],
@@ -295,7 +306,9 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "okres": {"od": "2026-12-30", "do": "2027-05-18", "tygodnie": 20},
  "kwota": {"miesieczna": "…", "za_okres": "…", "stawka": "1.00", "podstawa_wymiaru": "…",
            "brutto": true},
- "kto_wyplaca": "zus", "gdzie_zlozyc": "ZUS (wniosek ZAM) – pracodawca przekaże Z-3",
+ "kto_wyplaca": "zus",            // zus | platnik
+ "kto_wyplaca_opis": "Zasiłek wypłaci ZUS (art. 61 ustawy zasiłkowej).",
+ "gdzie_zlozyc": "ZUS (wniosek ZAM) – pracodawca przekaże Z-3",
  "uzasadnienie": ["Podlegasz ubezpieczeniu chorobowemu od 01.10.2024.", "…"],
  "powody": [],                    // przy nie_przysluguje: [{"pole": "...", "wartosc": "...", "komunikat": "..."}]
  "warunki": [{"opis": "Ubezpieczenie chorobowe w dniu porodu", "ryzyko": "brak_ubezpieczenia_w_dniu_porodu"}],

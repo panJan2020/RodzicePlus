@@ -1,11 +1,11 @@
-// FR-02 – symulowane pobranie z ZUS danych o ubezpieczeniu albo o jego braku.
+// „Moje ubezpieczenie”: pobranie danych z ZUS do sprawy i stan ubezpieczenia (albo jego braku).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_serwer.dart';
 
 void main() {
-  testWidgets('ubezpieczona: status, okres i zapis do sprawy (komputer)', (tester) async {
+  testWidgets('ubezpieczona: dane z ZUS pobrane do sprawy, status i okres (komputer)', (tester) async {
     await uruchomAplikacje(tester, const Size(1440, 900));
     await tester.tap(find.text('Ubezpieczenie'));
     await tester.pumpAndSettle();
@@ -16,11 +16,15 @@ void main() {
     expect(find.text('01.03.2021 – nadal'), findsOneWidget);
     expect(find.text('Ubezpieczenie chorobowe: obowiązkowe'), findsOneWidget);
 
-    await tester.tap(find.text('Zapisz w mojej sprawie'));
-    await tester.pumpAndSettle();
-    expect(find.text('Zapisano dane z ZUS w Twojej sprawie.'), findsOneWidget);
+    expect(find.textContaining('Dane z ZUS są zapisane w Twojej sprawie'), findsOneWidget);
     expect(wywolania['/sprawy'], 1);
-    expect(wywolania['/zus/pobierz-do-sprawy/sprawa1'], 1);
+    for (final kod in ['zus_konto', 'zus_platnik', 'ezla']) {
+      expect(wywolania['/sprawy/sprawa1/zrodla/$kod/pobierz'], 1, reason: kod);
+    }
+
+    await tester.tap(find.text('Pobierz ponownie z ZUS'));
+    await tester.pumpAndSettle();
+    expect(wywolania['/sprawy/sprawa1/zrodla/zus_konto/pobierz'], 2);
   });
 
   testWidgets('brak ubezpieczenia: ostrzeżenie i zakończony okres (telefon)', (tester) async {

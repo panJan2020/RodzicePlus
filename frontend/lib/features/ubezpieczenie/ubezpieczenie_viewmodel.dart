@@ -3,31 +3,39 @@ import 'package:flutter/foundation.dart';
 import '../../data/api_client.dart';
 import '../../data/models/modele.dart';
 import '../../data/repositories/sprawa_repository.dart';
-import '../../data/repositories/zus_repository.dart';
 
-/// Ekran „Moje ubezpieczenie” – dane z ZUS (symulacja, FR-02).
+/// Ekran „Moje ubezpieczenie” – stan ubezpieczenia z danych sprawy (źródło: konto w ZUS, symulacja).
+///
+/// Przy pierwszym wejściu sprawa nie ma jeszcze danych z ZUS – wtedy pobieramy je automatycznie
+/// (konto ubezpieczonego, dane płatnika, e-ZLA) i zapisujemy w sprawie.
 class UbezpieczenieViewModel extends ChangeNotifier {
-  UbezpieczenieViewModel(this._zus, this._sprawy) {
+  UbezpieczenieViewModel(this._sprawy) {
     zaladuj();
   }
 
-  final ZusRepository _zus;
   final SprawaRepository _sprawy;
 
   DaneUbezpieczenia? dane;
   bool laduje = false;
   String? blad;
 
-  bool zapisuje = false;
-  WynikPobrania? wynikZapisu;
-  String? bladZapisu;
+  /// Ostatnie pobranie z ZUS w tej wizycie (null – dane były już w sprawie).
+  ZmianaDanych? pobrano;
+  bool pobiera = false;
+  String? bladPobrania;
 
   Future<void> zaladuj() async {
     laduje = true;
     blad = null;
     notifyListeners();
     try {
-      dane = await _zus.ubezpieczenie();
+      try {
+        dane = await _sprawy.ubezpieczenie();
+      } on ApiException catch (e) {
+        if (e.kod != 404) rethrow;
+        pobrano = await _sprawy.pobierzZZus();
+        dane = await _sprawy.ubezpieczenie();
+      }
     } on ApiException catch (e) {
       blad = e.komunikat;
     } finally {
@@ -36,20 +44,19 @@ class UbezpieczenieViewModel extends ChangeNotifier {
     }
   }
 
-  /// Zapisuje dane z ZUS w profilu sprawy, żeby kreator o nie nie pytał.
-  Future<void> zapiszWSprawie() async {
-    if (zapisuje) return;
-    zapisuje = true;
-    bladZapisu = null;
+  /// Ponowne pobranie danych z ZUS (np. po zmianie umowy). Wartości z innych źródeł zostają.
+  Future<void> pobierzPonownie() async {
+    if (pobiera) return;
+    pobiera = true;
+    bladPobrania = null;
     notifyListeners();
     try {
-      final id = await _sprawy.biezacaSprawa();
-      wynikZapisu = await _zus.pobierzDoSprawy(id);
-      dane = wynikZapisu!.ubezpieczenie;
+      pobrano = await _sprawy.pobierzZZus();
+      dane = await _sprawy.ubezpieczenie();
     } on ApiException catch (e) {
-      bladZapisu = e.komunikat;
+      bladPobrania = e.komunikat;
     } finally {
-      zapisuje = false;
+      pobiera = false;
       notifyListeners();
     }
   }

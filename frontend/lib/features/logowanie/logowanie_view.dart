@@ -8,7 +8,7 @@ import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import 'logowanie_viewmodel.dart';
 
-/// Symulowane logowanie przez mObywatela (FR-01): wybór fikcyjnego konta testowego.
+/// Symulowane logowanie przez mObywatela: wybór fikcyjnego konta testowego.
 class LogowanieView extends StatelessWidget {
   const LogowanieView({super.key});
 

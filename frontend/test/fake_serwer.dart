@@ -8,7 +8,7 @@ import 'package:http/testing.dart';
 import 'package:rodziceplus/app.dart';
 import 'package:rodziceplus/data/api_client.dart';
 
-http.Response _json(Object o, [int kod = 200]) =>
+http.Response _json(Object? o, [int kod = 200]) =>
     http.Response.bytes(utf8.encode(jsonEncode(o)), kod, headers: {'content-type': 'application/json'});
 
 const _konta = {
@@ -16,8 +16,10 @@ const _konta = {
   'kasia': {'imie': 'Katarzyna', 'nazwisko': 'Przykładowa', 'opis': 'Umowa o dzieło.'},
 };
 
-Map<String, Object?> _sesja(String login) =>
-    {'token': 'sim-$login', 'login': login, 'imie': _konta[login]!['imie'], 'nazwisko': _konta[login]!['nazwisko']};
+Map<String, Object?> _sesja(String login) => {
+      'token': 'sim-$login', 'login': login, 'imie': _konta[login]!['imie'],
+      'nazwisko': _konta[login]!['nazwisko'], 'admin': false,
+    };
 
 Map<String, Object?> _ubezpieczenie(String login) => login == 'anna'
     ? {
@@ -28,14 +30,10 @@ Map<String, Object?> _ubezpieczenie(String login) => login == 'anna'
         'okresy': [
           {
             'tytul': 'umowa_o_prace', 'tytul_opis': 'Umowa o pracę', 'platnik': 'Hurtownia Przykładowa S.A.',
-            'platnik_ponad_20': 'ponad_20', 'od': '2021-03-01', 'do': null, 'chorobowe': true,
-            'chorobowe_dobrowolne': false, 'aktywny': true,
+            'platnik_ponad_20': true, 'od': '2021-03-01', 'do': null, 'wymiar_etatu': '1.00', 'chorobowe': true,
+            'chorobowe_dobrowolne': false, 'aktywny': true, 'zrodlo_opis': 'Konto w ZUS',
           },
         ],
-        'tytuly': ['umowa_o_prace'],
-        'chorobowe_od': '2021-03-01',
-        'chorobowe_dobrowolne': false,
-        'platnik_ponad_20': 'ponad_20',
       }
     : {
         'stan_na': '2026-11-21',
@@ -45,14 +43,10 @@ Map<String, Object?> _ubezpieczenie(String login) => login == 'anna'
         'okresy': [
           {
             'tytul': 'umowa_o_prace', 'tytul_opis': 'Umowa o pracę', 'platnik': 'Sklep Testowy sp. z o.o.',
-            'od': '2022-01-01', 'do': '2026-08-31', 'chorobowe': true, 'chorobowe_dobrowolne': false,
-            'aktywny': false,
+            'platnik_ponad_20': true, 'od': '2022-01-01', 'do': '2026-08-31', 'wymiar_etatu': null, 'chorobowe': true,
+            'chorobowe_dobrowolne': false, 'aktywny': false, 'zrodlo_opis': 'Konto w ZUS',
           },
         ],
-        'tytuly': ['dzielo'],
-        'chorobowe_od': null,
-        'chorobowe_dobrowolne': null,
-        'platnik_ponad_20': null,
       };
 
 /// Ile razy wywołano dany endpoint (do sprawdzeń w testach).
@@ -61,13 +55,43 @@ final wywolania = <String, int>{};
 /// Odpowiedzi zapisane przez POST /sprawy/sprawa1/odpowiedzi (pole → wartość).
 final odpowiedzi = <String, Object?>{};
 
+/// Czy pobrano już dane z ZUS do sprawy (wtedy /ubezpieczenie zwraca dane zamiast 404).
+var _pobranoZus = false;
+
+const _liczniki = {'konflikty': 0, 'niespojnosci': 0, 'brakujace_pola': 2};
+
+Map<String, Object?> _zmiana({int dodano = 1}) => {
+      'dodano': dodano, 'zmieniono_aktywne': ['sytuacja'], 'nowe_konflikty': 0, 'liczniki': _liczniki,
+      'wyniki_nieaktualne': true,
+    };
+
+Map<String, Object?> _sprawa() => {
+      'id': 'sprawa1', 'nazwa': 'Moja sprawa', 'zdarzenie': 'urodzenie', 'utworzono': '2026-11-22T01:00:00Z',
+      'osoby': [
+        {'id': 'o1', 'rola': 'matka', 'imie': null, 'zalogowana': false},
+        {'id': 'o2', 'rola': 'dziecko', 'imie': 'Dziecko', 'zalogowana': false},
+      ],
+      'liczniki': {..._liczniki, 'dokumenty': 0},
+      'ma_decyzje_zus': false,
+    };
+
+Map<String, Object?> _wartosc(String id, Object? v,
+        {String wystawca = 'uzytkownik', String kanal = 'kreator', String opis = 'Twoja odpowiedź',
+        double pewnosc = 1, bool doSprawdzenia = false}) =>
+    {
+      'id': id, 'wartosc': v, 'wystawca': wystawca, 'kanal': kanal, 'zrodlo_opis': opis, 'dokument_id': null,
+      'strona': null, 'pewnosc': pewnosc, 'do_sprawdzenia': doSprawdzenia, 'aktywna': true,
+      'utworzono': '2026-11-22T01:10:00Z',
+    };
+
 Map<String, Object?> _pytanie(String id, String sekcja, String pole, String tresc, String typ,
         {String status = 'aktywne', List<String> czekaNa = const [], Map<String, Object?>? wartosc,
-        List<Map<String, String>> opcje = const [], bool doSprawdzenia = false}) =>
+        List<Map<String, String>> opcje = const []}) =>
     {
       'id': id, 'sekcja': sekcja, 'pole': pole, 'tresc': tresc, 'typ': typ, 'opcje': opcje,
-      'pomoc': null, 'gdzie_znalezc': null, 'status': status, 'czeka_na': czekaNa, 'wartosc': wartosc,
-      'odpowiedziane': wartosc != null, 'do_sprawdzenia': doSprawdzenia,
+      'pomoc': null, 'gdzie_znalezc': null, 'rodzaj': 'fakt', 'edytowalne': true, 'na_tytul': false, 'klucze': [],
+      'status': status, 'czeka_na': czekaNa, 'wartosci': [?wartosc], 'aktywna_wartosc_id': wartosc?['id'],
+      'wybor_aktywnej': 'automatyczny', 'konflikt': false,
     };
 
 /// Uproszczone drzewo: A1 → G2 (zablokowane, dopóki brak A1), B1 z niepewnego odczytu Z-3,
@@ -75,20 +99,21 @@ Map<String, Object?> _pytanie(String id, String sekcja, String pole, String tres
 Map<String, Object?> _drzewo() {
   final a1 = odpowiedzi['sytuacja'];
   return {
-    'osoba': 0, 'rola': 'matka', 'postep': {'odpowiedziane': a1 == null ? 1 : 2, 'aktywne': a1 == null ? 2 : 3},
+    'osoba': {'id': 'o1', 'rola': 'matka', 'imie': null},
+    'postep': {'odpowiedziane': a1 == null ? 1 : 2, 'aktywne': a1 == null ? 2 : 3},
     'sekcje': [
       {'id': 'A', 'tytul': 'Sytuacja i rola', 'postep': {'odpowiedziane': a1 == null ? 0 : 1, 'aktywne': 1},
        'pytania': [
          _pytanie('A1', 'A', 'sytuacja', 'Jaka jest Twoja sytuacja?', 'wielokrotny',
              opcje: [{'wartosc': 'ciaza', 'etykieta': 'Jestem w ciąży'}, {'wartosc': 'urodzenie', 'etykieta': 'Dziecko się urodziło'}],
-             wartosc: a1 == null ? null : {'wartosc': a1, 'zrodlo': 'uzytkownik', 'potwierdzone': true}),
+             wartosc: a1 == null ? null : _wartosc('w1', a1)),
        ]},
       {'id': 'B', 'tytul': 'Ubezpieczenie', 'postep': {'odpowiedziane': 1, 'aktywne': 1},
        'pytania': [
          _pytanie('B1', 'B', 'tytuly', 'Na jakiej podstawie pracujesz?', 'wielokrotny',
              opcje: [{'wartosc': 'umowa_o_prace', 'etykieta': 'Umowa o pracę'}],
-             wartosc: {'wartosc': ['umowa_o_prace'], 'zrodlo': 'dokument', 'dokument': 'Z-3', 'strona': 2, 'pewnosc': 0.4},
-             doSprawdzenia: true),
+             wartosc: _wartosc('w2', ['umowa_o_prace'], wystawca: 'pracodawca', kanal: 'upload', opis: 'Z-3, str. 2',
+                 pewnosc: 0.4, doSprawdzenia: true)),
        ]},
       {'id': 'G', 'tytul': 'Poród i dziecko', 'postep': {'odpowiedziane': 0, 'aktywne': a1 == null ? 0 : 1},
        'pytania': [
@@ -103,6 +128,16 @@ Map<String, Object?> _drzewo() {
   };
 }
 
+/// Drzewo dziecka: tylko „Za życiem”.
+Map<String, Object?> _drzewoDziecka() => {
+      'osoba': {'id': 'o2', 'rola': 'dziecko', 'imie': 'Dziecko'},
+      'postep': {'odpowiedziane': 0, 'aktywne': 1},
+      'sekcje': [
+        {'id': 'G', 'tytul': 'Poród i dziecko', 'postep': {'odpowiedziane': 0, 'aktywne': 1},
+         'pytania': [_pytanie('G4', 'G', 'za_zyciem', 'Czy dziecko ma zaświadczenie „Za życiem”?', 'tak_nie')]},
+      ],
+    };
+
 final fakeSerwer = MockClient((r) async {
   final p = r.url.path;
   wywolania[p] = (wywolania[p] ?? 0) + 1;
@@ -114,42 +149,46 @@ final fakeSerwer = MockClient((r) async {
     ]);
   }
   if (p == '/auth/mobywatel') {
-    final l = (jsonDecode(r.body) as Map)['uzytkownik'] as String;
+    final l = (jsonDecode(r.body) as Map)['login'] as String;
     return _konta.containsKey(l) ? _json(_sesja(l)) : _json({'detail': 'Nie ma takiego konta testowego.'}, 404);
   }
-  if (!zalogowany && (p == '/auth/ja' || p.startsWith('/zus'))) {
+  if (!zalogowany && (p == '/auth/ja' || p.contains('/zrodla/'))) {
     return _json({'detail': 'Sesja wygasła.'}, 401);
   }
   if (p == '/auth/ja') return _json(_sesja(login!));
-  if (p == '/zus/ubezpieczenie') return _json(_ubezpieczenie(login!));
-  if (p == '/sprawy' && r.method == 'POST') return _json({'id': 'sprawa1', 'osoby': []});
-  if (p == '/sprawy/sprawa1/dane') return _json(_drzewo());
+  if (p == '/sprawy' && r.method == 'POST') return _json(_sprawa());
+  if (p == '/sprawy/sprawa1') return _json(_sprawa());
+  if (p == '/sprawy/sprawa1/dane') {
+    return _json(r.url.queryParameters['osoba'] == 'o2' ? _drzewoDziecka() : _drzewo());
+  }
   if (p == '/sprawy/sprawa1/odpowiedzi') {
     for (final o in jsonDecode(r.body) as List) {
       odpowiedzi[(o as Map)['pole'] as String] = o['wartosc'];
     }
-    return _json({'id': 'sprawa1', 'osoby': []});
+    return _json(_zmiana());
   }
-  if (p == '/sprawy/sprawa1/uprawnienia') {
+  if (p.startsWith('/sprawy/sprawa1/zrodla/') && p.endsWith('/pobierz')) {
+    _pobranoZus = true;
+    return _json(_zmiana(dodano: 3));
+  }
+  if (p == '/sprawy/sprawa1/ubezpieczenie') {
+    return _pobranoZus
+        ? _json(_ubezpieczenie(login ?? 'anna'))
+        : _json({'detail': 'Nie mamy jeszcze danych o Twoim ubezpieczeniu. Pobierz je z ZUS.'}, 404);
+  }
+  if (p == '/sprawy/sprawa1/swiadczenia') {
     return _json([
       {
-        'swiadczenie': 'zasilek_macierzynski', 'status': 'brak_danych',
-        'uzasadnienie': ['Uzupełnij dane, aby ustalić prawo do zasiłku.'],
-        'podstawa_prawna': ['art. 29 ustawy zasiłkowej'], 'brakujace_pola': ['B1'],
-        'brakujace_pytania': [{'id': 'B1', 'tresc': 'Na jakiej podstawie pracujesz?', 'gdzie_znalezc': null}],
-        'ostrzezenia': [], 'kto_wyplaca': null,
+        'swiadczenie': 'zasilek_macierzynski', 'nazwa': 'Zasiłek macierzyński', 'osoba_id': 'o1',
+        'status': 'brak_danych', 'uzasadnienie': ['Uzupełnij dane, aby ustalić prawo do zasiłku.'], 'powody': [],
+        'brakujace_pola': [{'pytanie_id': 'B1', 'tresc': 'Na jakiej podstawie pracujesz?', 'gdzie_znalezc': null}],
+        'kto_wyplaca': null, 'kto_wyplaca_opis': null, 'podstawa_prawna': ['art. 29 ustawy zasiłkowej'],
+        'wersja_parametrow': '2026-01-01',
       },
     ]);
   }
   if (p == '/sprawy/sprawa1/kalkulator') {
     return _json({'detail': 'Aby policzyć zasiłek, podaj datę porodu (pytania G1, G2).'}, 422);
-  }
-  if (p == '/zus/pobierz-do-sprawy/sprawa1') {
-    return _json({
-      'uzupelniono': ['tytuly', 'chorobowe_od'],
-      'pominieto': [],
-      'ubezpieczenie': _ubezpieczenie(login!),
-    });
   }
   return _json({'detail': 'Nie znaleziono'}, 404);
 });
@@ -157,6 +196,7 @@ final fakeSerwer = MockClient((r) async {
 Future<void> uruchomAplikacje(WidgetTester tester, Size rozmiar) async {
   wywolania.clear();
   odpowiedzi.clear();
+  _pobranoZus = false;
   tester.view.physicalSize = rozmiar;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);

@@ -3,17 +3,21 @@ import 'package:flutter/foundation.dart';
 import '../../data/api_client.dart';
 import '../../data/models/modele.dart';
 import '../../data/repositories/sprawa_repository.dart';
-import '../../data/repositories/zus_repository.dart';
 
-/// Zakładka „Moje dane” – całe drzewo pytań do przeglądu i edycji.
-/// Stany pytań (aktywne / zablokowane / wykluczone) liczy backend; tu trzymamy tylko stan ekranu.
+/// Zakładka „Moje dane” – wszystkie pytania wybranej osoby w sprawie (Ty, dziecko…) do przeglądu i edycji.
+/// Stany pytań (aktywne / zablokowane / wykluczone) i aktywne wartości liczy backend; tu trzymamy tylko stan ekranu.
 class DaneViewModel extends ChangeNotifier {
-  DaneViewModel(this._sprawy, this._zus, {String? pytanie}) {
+  DaneViewModel(this._sprawy, {String? pytanie}) {
     zaladuj(pokaz: pytanie);
   }
 
   final SprawaRepository _sprawy;
-  final ZusRepository _zus;
+
+  /// Osoby w sprawie (przełącznik nad pytaniami).
+  List<OsobaSprawy> osoby = const [];
+
+  /// Wybrana osoba; `null` – wnioskodawca (pierwsza osoba).
+  String? osobaId;
 
   DaneOsoby? dane;
   bool laduje = false;
@@ -40,6 +44,9 @@ class DaneViewModel extends ChangeNotifier {
 
   List<SekcjaDanych> get sekcje => dane?.widoczneSekcje ?? const [];
 
+  /// Czy wybrana jest osoba prowadząca sprawę (dla niej działa „Uzupełnij danymi z ZUS”).
+  bool get wybranyWnioskodawca => osoby.isEmpty || (osobaId ?? osoby.first.id) == osoby.first.id;
+
   SekcjaDanych? get sekcjaWybrana {
     for (final s in sekcje) {
       if (s.id == wybranaSekcja) return s;
@@ -52,7 +59,8 @@ class DaneViewModel extends ChangeNotifier {
     blad = null;
     notifyListeners();
     try {
-      dane = await _sprawy.dane();
+      osoby = (await _sprawy.sprawa()).osoby;
+      dane = await _sprawy.dane(osoba: osobaId);
       _poprawWybor();
       if (pokaz != null) this.pokaz(pokaz, powiadom: false);
     } on ApiException catch (e) {
@@ -61,6 +69,19 @@ class DaneViewModel extends ChangeNotifier {
       laduje = false;
       notifyListeners();
     }
+  }
+
+  /// Przełącza pytania na inną osobę w sprawie (np. dziecko).
+  Future<void> wybierzOsobe(String id) async {
+    if (id == (osobaId ?? osoby.first.id)) return;
+    osobaId = id;
+    dane = null;
+    wybranaSekcja = null;
+    rozwiniete.clear();
+    wyroznione = null;
+    komunikat = null;
+    bladZapisu = null;
+    await zaladuj();
   }
 
   /// Rozwija sekcję pytania, wyróżnia je i prosi widok o przewinięcie.
@@ -93,8 +114,8 @@ class DaneViewModel extends ChangeNotifier {
     komunikat = null;
     notifyListeners();
     try {
-      await _sprawy.zapiszOdpowiedz(p.pole, wartosc);
-      dane = await _sprawy.dane();
+      await _sprawy.zapiszOdpowiedz(p.pole, wartosc, osoba: osobaId);
+      dane = await _sprawy.dane(osoba: osobaId);
       _poprawWybor();
       wyroznione = p.id;
     } on ApiException catch (e) {
@@ -105,18 +126,20 @@ class DaneViewModel extends ChangeNotifier {
     }
   }
 
-  /// Uzupełnia sprawę danymi z ZUS (tylko po zalogowaniu). Odpowiedzi użytkownika zostają.
+  /// Uzupełnia sprawę danymi z ZUS (tylko po zalogowaniu). Odpowiedzi użytkownika zostają jako osobne wartości.
   Future<void> pobierzZZus() async {
     pobieraZus = true;
     komunikat = null;
     bladZapisu = null;
     notifyListeners();
     try {
-      final id = await _sprawy.biezacaSprawa();
-      await _zus.pobierzDoSprawy(id);
-      dane = await _sprawy.dane();
+      final zmiana = await _sprawy.pobierzZZus();
+      dane = await _sprawy.dane(osoba: osobaId);
       _poprawWybor();
-      komunikat = 'Uzupełniliśmy dane z ZUS. Twoje wcześniejsze odpowiedzi zostały bez zmian.';
+      komunikat = zmiana.noweKonflikty == 0
+          ? 'Uzupełniliśmy dane z ZUS.'
+          : 'Uzupełniliśmy dane z ZUS. Część z nich różni się od Twoich odpowiedzi – do wyliczeń używamy '
+              'danych z ZUS, a Twoja odpowiedź zostaje zapisana.';
     } on ApiException catch (e) {
       bladZapisu = e.komunikat;
     } finally {

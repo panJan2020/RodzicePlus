@@ -1,5 +1,14 @@
 /// Modele danych z API. Kształt = docs/api.md (zmieniaj oba pliki w tym samym commicie).
+///
+/// Kwoty i stawki przychodzą jako tekst (`"1234.56"`, `"0.815"`) – Flutter ich nie przelicza, tylko formatuje.
 library;
+
+DateTime? _dataLubNull(Object? v) => v == null ? null : DateTime.parse(v as String);
+List<String> _teksty(Object? v) => (v as List? ?? const []).cast<String>();
+
+// ---------------------------------------------------------------------------
+// Logowanie (docs/api.md 2.1, 3.1)
+// ---------------------------------------------------------------------------
 
 /// Konto testowe do symulowanego logowania (GET /auth/mobywatel/konta).
 class KontoTestowe {
@@ -22,12 +31,13 @@ class KontoTestowe {
 
 /// Wynik logowania (POST /auth/mobywatel, GET /auth/ja).
 class Sesja {
-  const Sesja({required this.token, required this.login, required this.imie, required this.nazwisko});
+  const Sesja({required this.token, required this.login, required this.imie, required this.nazwisko, this.admin = false});
 
   final String token;
   final String login;
   final String imie;
   final String nazwisko;
+  final bool admin;
 
   String get imieINazwisko => '$imie $nazwisko';
 
@@ -36,12 +46,103 @@ class Sesja {
         login: j['login'] as String,
         imie: j['imie'] as String,
         nazwisko: j['nazwisko'] as String,
+        admin: (j['admin'] as bool?) ?? false,
       );
 }
 
-DateTime? _dataLubNull(Object? v) => v == null ? null : DateTime.parse(v as String);
+// ---------------------------------------------------------------------------
+// Sprawa i osoby (docs/api.md 2.2, 3.1)
+// ---------------------------------------------------------------------------
 
-/// Jeden okres ubezpieczenia z konta w ZUS (symulacja, FR-02).
+enum RolaOsoby {
+  matka('matka'),
+  ojciec('ojciec'),
+  drugiRodzic('drugi_rodzic'),
+  dziecko('dziecko');
+
+  const RolaOsoby(this.json);
+  final String json;
+  static RolaOsoby zJson(String s) => values.firstWhere((r) => r.json == s);
+}
+
+class OsobaSprawy {
+  const OsobaSprawy({required this.id, required this.rola, this.imie, this.zalogowana = false});
+
+  final String id;
+  final RolaOsoby rola;
+  final String? imie;
+  final bool zalogowana;
+
+  factory OsobaSprawy.fromJson(Map<String, dynamic> j) => OsobaSprawy(
+        id: j['id'] as String,
+        rola: RolaOsoby.zJson(j['rola'] as String),
+        imie: j['imie'] as String?,
+        zalogowana: (j['zalogowana'] as bool?) ?? false,
+      );
+}
+
+class Liczniki {
+  const Liczniki({this.konflikty = 0, this.niespojnosci = 0, this.brakujacePola = 0});
+
+  final int konflikty;
+  final int niespojnosci;
+  final int brakujacePola;
+
+  factory Liczniki.fromJson(Map<String, dynamic> j) => Liczniki(
+        konflikty: (j['konflikty'] as int?) ?? 0,
+        niespojnosci: (j['niespojnosci'] as int?) ?? 0,
+        brakujacePola: (j['brakujace_pola'] as int?) ?? 0,
+      );
+}
+
+/// GET /sprawy/{id}, POST /sprawy
+class Sprawa {
+  const Sprawa({required this.id, required this.nazwa, required this.zdarzenie, required this.osoby, required this.liczniki});
+
+  final String id;
+  final String nazwa;
+  final String zdarzenie;
+  final List<OsobaSprawy> osoby;
+  final Liczniki liczniki;
+
+  factory Sprawa.fromJson(Map<String, dynamic> j) => Sprawa(
+        id: j['id'] as String,
+        nazwa: j['nazwa'] as String,
+        zdarzenie: j['zdarzenie'] as String,
+        osoby: [for (final o in j['osoby'] as List) OsobaSprawy.fromJson(o as Map<String, dynamic>)],
+        liczniki: Liczniki.fromJson(j['liczniki'] as Map<String, dynamic>),
+      );
+}
+
+/// Odpowiedź po każdej zmianie danych (POST /odpowiedzi, POST /zrodla/{kod}/pobierz).
+class ZmianaDanych {
+  const ZmianaDanych({
+    required this.dodano,
+    required this.zmienionoAktywne,
+    required this.noweKonflikty,
+    required this.liczniki,
+    required this.wynikiNieaktualne,
+  });
+
+  final int dodano;
+  final List<String> zmienionoAktywne;
+  final int noweKonflikty;
+  final Liczniki liczniki;
+  final bool wynikiNieaktualne;
+
+  factory ZmianaDanych.fromJson(Map<String, dynamic> j) => ZmianaDanych(
+        dodano: j['dodano'] as int,
+        zmienionoAktywne: _teksty(j['zmieniono_aktywne']),
+        noweKonflikty: j['nowe_konflikty'] as int,
+        liczniki: Liczniki.fromJson(j['liczniki'] as Map<String, dynamic>),
+        wynikiNieaktualne: j['wyniki_nieaktualne'] as bool,
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Ubezpieczenie (GET /sprawy/{id}/ubezpieczenie – docs/api.md 3.5)
+// ---------------------------------------------------------------------------
+
 class OkresUbezpieczenia {
   const OkresUbezpieczenia({
     required this.tytul,
@@ -53,32 +154,38 @@ class OkresUbezpieczenia {
     required this.aktywny,
     this.platnikPonad20,
     this.doDnia,
+    this.wymiarEtatu,
+    this.zrodloOpis,
   });
 
   final String tytul;
   final String tytulOpis;
   final String platnik;
-  final String? platnikPonad20;
+  final bool? platnikPonad20;
   final DateTime odDnia;
   final DateTime? doDnia; // null = trwa
+  final String? wymiarEtatu; // tekst, np. "1.00"
   final bool chorobowe;
   final bool chorobowoDobrowolne;
   final bool aktywny;
+  final String? zrodloOpis;
 
   factory OkresUbezpieczenia.fromJson(Map<String, dynamic> j) => OkresUbezpieczenia(
         tytul: j['tytul'] as String,
         tytulOpis: j['tytul_opis'] as String,
         platnik: j['platnik'] as String,
-        platnikPonad20: j['platnik_ponad_20'] as String?,
+        platnikPonad20: j['platnik_ponad_20'] as bool?,
         odDnia: DateTime.parse(j['od'] as String),
         doDnia: _dataLubNull(j['do']),
+        wymiarEtatu: j['wymiar_etatu'] as String?,
         chorobowe: j['chorobowe'] as bool,
         chorobowoDobrowolne: (j['chorobowe_dobrowolne'] as bool?) ?? false,
         aktywny: j['aktywny'] as bool,
+        zrodloOpis: j['zrodlo_opis'] as String?,
       );
 }
 
-/// Dane o ubezpieczeniu (GET /zus/ubezpieczenie). Teksty przychodzą gotowe z backendu.
+/// Teksty przychodzą gotowe z backendu.
 class DaneUbezpieczenia {
   const DaneUbezpieczenia({
     required this.stanNa,
@@ -86,10 +193,6 @@ class DaneUbezpieczenia {
     required this.podsumowanie,
     required this.wyjasnienia,
     required this.okresy,
-    required this.tytuly,
-    this.chorobowoOd,
-    this.chorobowoDobrowolne,
-    this.platnikPonad20,
   });
 
   final DateTime stanNa;
@@ -97,71 +200,72 @@ class DaneUbezpieczenia {
   final String podsumowanie;
   final List<String> wyjasnienia;
   final List<OkresUbezpieczenia> okresy;
-  final List<String> tytuly;
-  final DateTime? chorobowoOd;
-  final bool? chorobowoDobrowolne;
-  final String? platnikPonad20;
 
   factory DaneUbezpieczenia.fromJson(Map<String, dynamic> j) => DaneUbezpieczenia(
         stanNa: DateTime.parse(j['stan_na'] as String),
         ubezpieczonyChorobowo: j['ubezpieczony_chorobowo'] as bool,
         podsumowanie: j['podsumowanie'] as String,
-        wyjasnienia: (j['wyjasnienia'] as List).cast<String>(),
-        okresy: (j['okresy'] as List).map((e) => OkresUbezpieczenia.fromJson(e as Map<String, dynamic>)).toList(),
-        tytuly: (j['tytuly'] as List).cast<String>(),
-        chorobowoOd: _dataLubNull(j['chorobowe_od']),
-        chorobowoDobrowolne: j['chorobowe_dobrowolne'] as bool?,
-        platnikPonad20: j['platnik_ponad_20'] as String?,
-      );
-}
-
-/// Wynik POST /zus/pobierz-do-sprawy/{id}.
-class WynikPobrania {
-  const WynikPobrania({required this.uzupelniono, required this.pominieto, required this.ubezpieczenie});
-
-  final List<String> uzupelniono;
-  final List<String> pominieto;
-  final DaneUbezpieczenia ubezpieczenie;
-
-  factory WynikPobrania.fromJson(Map<String, dynamic> j) => WynikPobrania(
-        uzupelniono: (j['uzupelniono'] as List).cast<String>(),
-        pominieto: (j['pominieto'] as List).cast<String>(),
-        ubezpieczenie: DaneUbezpieczenia.fromJson(j['ubezpieczenie'] as Map<String, dynamic>),
+        wyjasnienia: _teksty(j['wyjasnienia']),
+        okresy: [for (final o in j['okresy'] as List) OkresUbezpieczenia.fromJson(o as Map<String, dynamic>)],
       );
 }
 
 // ---------------------------------------------------------------------------
-// Drzewo pytań – zakładka „Dane” (GET /sprawy/{id}/dane) i kreator.
+// Drzewo pytań – „Moje dane” (GET /sprawy/{id}/dane) i kreator (docs/api.md 3.2).
 // ---------------------------------------------------------------------------
 
-/// Skąd pochodzi wartość w sprawie.
-enum ZrodloWartosci { uzytkownik, zus, dokument, wyliczone }
+/// Kto ręczy za informację.
+enum Wystawca {
+  zus('zus'),
+  urzad('urzad'),
+  sad('sad'),
+  pracodawca('pracodawca'),
+  lekarz('lekarz'),
+  uzytkownik('uzytkownik'),
+  wyliczone('wyliczone');
 
-/// Wartość pola w sprawie (backend: FieldValue).
+  const Wystawca(this.json);
+  final String json;
+  static Wystawca zJson(String s) => values.firstWhere((w) => w.json == s);
+}
+
+/// Jedna wartość pola z jednego źródła.
 class WartoscPola {
   const WartoscPola({
+    required this.id,
     required this.wartosc,
-    required this.zrodlo,
-    this.dokument,
+    required this.wystawca,
+    required this.kanal,
+    required this.zrodloOpis,
+    this.dokumentId,
     this.strona,
-    this.pewnosc,
-    this.potwierdzone = false,
+    this.pewnosc = 1,
+    this.doSprawdzenia = false,
+    this.aktywna = false,
   });
 
+  final String id;
   final Object? wartosc;
-  final ZrodloWartosci zrodlo;
-  final String? dokument;
+  final Wystawca wystawca;
+  final String kanal; // mobywatel | zus_konto | … | upload | kreator | system
+  final String zrodloOpis; // gotowy tekst do „Skąd to wiemy”
+  final String? dokumentId;
   final int? strona;
-  final double? pewnosc;
-  final bool potwierdzone;
+  final double pewnosc;
+  final bool doSprawdzenia; // niepewny odczyt AI
+  final bool aktywna;
 
   factory WartoscPola.fromJson(Map<String, dynamic> j) => WartoscPola(
+        id: j['id'] as String,
         wartosc: j['wartosc'],
-        zrodlo: ZrodloWartosci.values.byName(j['zrodlo'] as String),
-        dokument: j['dokument'] as String?,
+        wystawca: Wystawca.zJson(j['wystawca'] as String),
+        kanal: j['kanal'] as String,
+        zrodloOpis: j['zrodlo_opis'] as String,
+        dokumentId: j['dokument_id'] as String?,
         strona: j['strona'] as int?,
-        pewnosc: (j['pewnosc'] as num?)?.toDouble(),
-        potwierdzone: (j['potwierdzone'] as bool?) ?? false,
+        pewnosc: ((j['pewnosc'] as num?) ?? 1).toDouble(),
+        doSprawdzenia: (j['do_sprawdzenia'] as bool?) ?? false,
+        aktywna: (j['aktywna'] as bool?) ?? false,
       );
 }
 
@@ -203,10 +307,15 @@ class PytanieDrzewa {
     this.opcje = const [],
     this.pomoc,
     this.gdzieZnalezc,
+    this.rodzaj = 'fakt',
+    this.edytowalne = true,
+    this.naTytul = false,
+    this.klucze = const [],
     this.czekaNa = const [],
-    this.wartosc,
-    this.odpowiedziane = false,
-    this.doSprawdzenia = false,
+    this.wartosci = const [],
+    this.aktywnaWartoscId,
+    this.wyborAktywnej = 'automatyczny',
+    this.konflikt = false,
   });
 
   final String id;
@@ -217,13 +326,30 @@ class PytanieDrzewa {
   final List<OpcjaPytania> opcje;
   final String? pomoc;
   final String? gdzieZnalezc;
+  final String rodzaj; // fakt | plan | wyliczone
+  final bool edytowalne; // false = tylko podgląd (np. e-ZLA)
+  final bool naTytul; // wartość = słownik {tytuł: odpowiedź}
+  final List<OpcjaPytania> klucze; // tytuły, dla których podajemy odpowiedź (pola „na tytuł”)
   final StatusPytania status;
   final List<String> czekaNa; // ID pytań, na które trzeba odpowiedzieć najpierw
-  final WartoscPola? wartosc;
-  final bool odpowiedziane;
-  final bool doSprawdzenia; // niepewny odczyt z dokumentu
+  final List<WartoscPola> wartosci; // wszystkie źródła
+  final String? aktywnaWartoscId;
+  final String wyborAktywnej; // automatyczny | uzytkownik
+  final bool konflikt;
 
-  bool get edytowalne => typ != TypPytania.okresy;
+  /// Aktywna wartość (ta, której używają wyliczenia) – w „Moich danych” pokazujemy ją i jej źródło.
+  WartoscPola? get wartosc {
+    for (final w in wartosci) {
+      if (w.id == aktywnaWartoscId) return w;
+    }
+    return null;
+  }
+
+  bool get odpowiedziane => aktywnaWartoscId != null;
+  bool get doSprawdzenia => wartosc?.doSprawdzenia ?? false;
+
+  /// Czy użytkownik wpisał już swoją wartość (wtedy można ją wyczyścić).
+  bool get maOdpowiedzUzytkownika => wartosci.any((w) => w.kanal == 'kreator');
 
   factory PytanieDrzewa.fromJson(Map<String, dynamic> j) => PytanieDrzewa(
         id: j['id'] as String,
@@ -234,11 +360,16 @@ class PytanieDrzewa {
         opcje: [for (final o in (j['opcje'] as List? ?? [])) OpcjaPytania.fromJson(o as Map<String, dynamic>)],
         pomoc: j['pomoc'] as String?,
         gdzieZnalezc: j['gdzie_znalezc'] as String?,
+        rodzaj: (j['rodzaj'] as String?) ?? 'fakt',
+        edytowalne: (j['edytowalne'] as bool?) ?? true,
+        naTytul: (j['na_tytul'] as bool?) ?? false,
+        klucze: [for (final o in (j['klucze'] as List? ?? [])) OpcjaPytania.fromJson(o as Map<String, dynamic>)],
         status: StatusPytania.values.byName(j['status'] as String),
-        czekaNa: (j['czeka_na'] as List? ?? []).cast<String>(),
-        wartosc: j['wartosc'] == null ? null : WartoscPola.fromJson(j['wartosc'] as Map<String, dynamic>),
-        odpowiedziane: (j['odpowiedziane'] as bool?) ?? false,
-        doSprawdzenia: (j['do_sprawdzenia'] as bool?) ?? false,
+        czekaNa: _teksty(j['czeka_na']),
+        wartosci: [for (final w in (j['wartosci'] as List? ?? [])) WartoscPola.fromJson(w as Map<String, dynamic>)],
+        aktywnaWartoscId: j['aktywna_wartosc_id'] as String?,
+        wyborAktywnej: (j['wybor_aktywnej'] as String?) ?? 'automatyczny',
+        konflikt: (j['konflikt'] as bool?) ?? false,
       );
 }
 
@@ -269,11 +400,20 @@ class SekcjaDanych {
       );
 }
 
+class OsobaSkrot {
+  const OsobaSkrot({required this.id, required this.rola, this.imie});
+  final String id;
+  final RolaOsoby rola;
+  final String? imie;
+
+  factory OsobaSkrot.fromJson(Map<String, dynamic> j) =>
+      OsobaSkrot(id: j['id'] as String, rola: RolaOsoby.zJson(j['rola'] as String), imie: j['imie'] as String?);
+}
+
 /// GET /sprawy/{id}/dane
 class DaneOsoby {
-  const DaneOsoby({required this.osoba, required this.rola, required this.postep, required this.sekcje});
-  final int osoba;
-  final String rola;
+  const DaneOsoby({required this.osoba, required this.postep, required this.sekcje});
+  final OsobaSkrot osoba;
   final Postep postep;
   final List<SekcjaDanych> sekcje;
 
@@ -290,128 +430,150 @@ class DaneOsoby {
   }
 
   factory DaneOsoby.fromJson(Map<String, dynamic> j) => DaneOsoby(
-        osoba: j['osoba'] as int,
-        rola: j['rola'] as String,
+        osoba: OsobaSkrot.fromJson(j['osoba'] as Map<String, dynamic>),
         postep: Postep.fromJson(j['postep'] as Map<String, dynamic>),
         sekcje: [for (final s in j['sekcje'] as List) SekcjaDanych.fromJson(s as Map<String, dynamic>)],
       );
 }
 
 // ---------------------------------------------------------------------------
-// Uprawnienia i kalkulator (GET /sprawy/{id}/uprawnienia, /kalkulator).
+// Świadczenia i kalkulator (GET /sprawy/{id}/swiadczenia, /kalkulator – docs/api.md 3.6–3.7).
 // ---------------------------------------------------------------------------
 
-enum StatusUprawnienia {
+enum StatusSwiadczenia {
   przysluguje('przysluguje'),
+  warunkowo('warunkowo'),
   niePrzysluguje('nie_przysluguje'),
   brakDanych('brak_danych');
 
-  const StatusUprawnienia(this.json);
+  const StatusSwiadczenia(this.json);
   final String json;
-  static StatusUprawnienia zJson(String s) => values.firstWhere((t) => t.json == s);
+  static StatusSwiadczenia zJson(String s) => values.firstWhere((t) => t.json == s);
 }
 
-class BrakujacePytanie {
-  const BrakujacePytanie({required this.id, required this.tresc, this.gdzieZnalezc});
-  final String id;
+class BrakujacePole {
+  const BrakujacePole({required this.pytanieId, required this.tresc, this.gdzieZnalezc});
+  final String pytanieId;
   final String tresc;
   final String? gdzieZnalezc;
 
-  factory BrakujacePytanie.fromJson(Map<String, dynamic> j) => BrakujacePytanie(
-        id: j['id'] as String,
+  factory BrakujacePole.fromJson(Map<String, dynamic> j) => BrakujacePole(
+        pytanieId: j['pytanie_id'] as String,
         tresc: j['tresc'] as String,
         gdzieZnalezc: j['gdzie_znalezc'] as String?,
       );
 }
 
-class WynikUprawnienia {
-  const WynikUprawnienia({
+class WynikSwiadczenia {
+  const WynikSwiadczenia({
     required this.swiadczenie,
+    required this.nazwa,
+    required this.osobaId,
     required this.status,
     this.uzasadnienie = const [],
     this.podstawaPrawna = const [],
     this.brakujacePola = const [],
-    this.brakujacePytania = const [],
-    this.ostrzezenia = const [],
     this.ktoWyplaca,
+    this.ktoWyplacaOpis,
   });
 
   final String swiadczenie;
-  final StatusUprawnienia status;
+  final String nazwa;
+  final String osobaId;
+  final StatusSwiadczenia status;
   final List<String> uzasadnienie;
   final List<String> podstawaPrawna;
-  final List<String> brakujacePola; // ID pytań
-  final List<BrakujacePytanie> brakujacePytania;
-  final List<String> ostrzezenia;
-  final String? ktoWyplaca;
+  final List<BrakujacePole> brakujacePola;
+  final String? ktoWyplaca; // zus | platnik
+  final String? ktoWyplacaOpis;
 
-  factory WynikUprawnienia.fromJson(Map<String, dynamic> j) => WynikUprawnienia(
+  factory WynikSwiadczenia.fromJson(Map<String, dynamic> j) => WynikSwiadczenia(
         swiadczenie: j['swiadczenie'] as String,
-        status: StatusUprawnienia.zJson(j['status'] as String),
-        uzasadnienie: (j['uzasadnienie'] as List? ?? []).cast<String>(),
-        podstawaPrawna: (j['podstawa_prawna'] as List? ?? []).cast<String>(),
-        brakujacePola: (j['brakujace_pola'] as List? ?? []).cast<String>(),
-        brakujacePytania: [
-          for (final b in (j['brakujace_pytania'] as List? ?? [])) BrakujacePytanie.fromJson(b as Map<String, dynamic>),
+        nazwa: j['nazwa'] as String,
+        osobaId: j['osoba_id'] as String,
+        status: StatusSwiadczenia.zJson(j['status'] as String),
+        uzasadnienie: _teksty(j['uzasadnienie']),
+        podstawaPrawna: _teksty(j['podstawa_prawna']),
+        brakujacePola: [
+          for (final b in (j['brakujace_pola'] as List? ?? [])) BrakujacePole.fromJson(b as Map<String, dynamic>),
         ],
-        ostrzezenia: (j['ostrzezenia'] as List? ?? []).cast<String>(),
         ktoWyplaca: j['kto_wyplaca'] as String?,
+        ktoWyplacaOpis: j['kto_wyplaca_opis'] as String?,
       );
 }
 
 class OkresZasilku {
   const OkresZasilku({
     required this.rodzaj,
-    required this.osoba,
     required this.odDnia,
     required this.doDnia,
+    required this.tygodnie,
     required this.stawka,
     required this.kwotaMiesieczna,
     required this.kwotaZaOkres,
+    this.osobaId,
     this.uwagi = const [],
   });
 
   final String rodzaj;
-  final String osoba;
+  final String? osobaId; // null – drugi rodzic spoza sprawy
   final DateTime odDnia;
   final DateTime doDnia;
-  final double stawka;
-  final double kwotaMiesieczna;
-  final double kwotaZaOkres;
+  final int tygodnie;
+  final String stawka; // "0.815"
+  final String kwotaMiesieczna; // "1234.56"
+  final String kwotaZaOkres;
   final List<String> uwagi;
 
   factory OkresZasilku.fromJson(Map<String, dynamic> j) => OkresZasilku(
         rodzaj: j['rodzaj'] as String,
-        osoba: j['osoba'] as String,
+        osobaId: j['osoba_id'] as String?,
         odDnia: DateTime.parse(j['od'] as String),
         doDnia: DateTime.parse(j['do'] as String),
-        stawka: (j['stawka'] as num).toDouble(),
-        kwotaMiesieczna: (j['kwota_miesieczna'] as num).toDouble(),
-        kwotaZaOkres: (j['kwota_za_okres'] as num).toDouble(),
-        uwagi: (j['uwagi'] as List? ?? []).cast<String>(),
+        tygodnie: j['tygodnie'] as int,
+        stawka: j['stawka'] as String,
+        kwotaMiesieczna: j['kwota_miesieczna'] as String,
+        kwotaZaOkres: j['kwota_za_okres'] as String,
+        uwagi: _teksty(j['uwagi']),
+      );
+}
+
+class OsobaKalkulatora {
+  const OsobaKalkulatora({required this.osobaId, required this.podstawaWymiaru, required this.suma});
+  final String osobaId;
+  final String podstawaWymiaru;
+  final String suma;
+
+  factory OsobaKalkulatora.fromJson(Map<String, dynamic> j) => OsobaKalkulatora(
+        osobaId: j['osoba_id'] as String,
+        podstawaWymiaru: j['podstawa_wymiaru'] as String,
+        suma: j['suma'] as String,
       );
 }
 
 class WynikKalkulatora {
   const WynikKalkulatora({
-    required this.podstawaWymiaru,
+    required this.scenariuszId,
+    required this.osoby,
     required this.okresy,
     required this.suma,
     required this.wersjaParametrow,
     this.ostrzezenia = const [],
   });
 
-  final double podstawaWymiaru;
+  final String scenariuszId;
+  final List<OsobaKalkulatora> osoby;
   final List<OkresZasilku> okresy;
-  final double suma;
+  final String suma;
   final String wersjaParametrow;
   final List<String> ostrzezenia;
 
   factory WynikKalkulatora.fromJson(Map<String, dynamic> j) => WynikKalkulatora(
-        podstawaWymiaru: (j['podstawa_wymiaru'] as num).toDouble(),
+        scenariuszId: j['scenariusz_id'] as String,
+        osoby: [for (final o in j['osoby'] as List) OsobaKalkulatora.fromJson(o as Map<String, dynamic>)],
         okresy: [for (final o in j['okresy'] as List) OkresZasilku.fromJson(o as Map<String, dynamic>)],
-        suma: (j['suma'] as num).toDouble(),
+        suma: j['suma'] as String,
         wersjaParametrow: j['wersja_parametrow'] as String,
-        ostrzezenia: (j['ostrzezenia'] as List? ?? []).cast<String>(),
+        ostrzezenia: _teksty(j['ostrzezenia']),
       );
 }
