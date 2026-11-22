@@ -164,7 +164,8 @@ Backend – Python FastAPI                                          ▼
 15. **Parametry wybieramy po dacie prawa** (`params.store.parametry_na_dzien`), nigdy „najnowsze”. Gdy nie ma pliku na rok
     tej daty, **nie zmieniamy roku po cichu**: bierzemy najbliższą wersję i dopisujemy widoczne ostrzeżenie do `uwagi`
     wyniku (robi to `api/swiadczenia.py`). Wartości, których nie umiemy zweryfikować, oznaczamy `do_weryfikacji`
-    w pliku parametrów i dopisujemy do sekcji Z w `docs/pytania_kalkulator.md`.
+    w kluczu `_zrodla` pliku parametrów (podstawa prawna, źródło, status) i dopisujemy do sekcji Z w
+    `docs/pytania_kalkulator.md`.
 
 ---
 
@@ -340,7 +341,7 @@ i dokumenty), rozporządzenie o wnioskach o urlopy (2025), Poradnik ZUS dla rodz
 - **Stawki:** 100% (macierzyński, na warunkach, uzupełniający, ojcowski) · 70% (rodzicielski) · 81,5% za całość przy wniosku
   do 21 dni po porodzie (9 tyg. drugiego rodzica zawsze 70%) · podwyższenie do kwoty świadczenia rodzicielskiego.
 - **Podstawa wymiaru:** pracownik – średnie wynagrodzenie z 12 mies. minus 13,71% (miesiące < ½ czasu pracy pomijane,
-  pozostałe uzupełniane, min. przy pełnym etacie); zleceniobiorca/działalność – średnia podstawa składek minus 13,71%
+  pozostałe uzupełniane, min. przy pełnym etacie; przy niepełnym – parametr `art45_niepelny_etat`, domyślnie proporcjonalnie, do potwierdzenia); zleceniobiorca/działalność – średnia podstawa składek minus 13,71%
   (limit 20 321,30 zł; wzór art. 48a przy ubezpieczeniu < 12 mies.). Przerwa między zasiłkami < 1 miesiąca → ta sama podstawa.
 - **Ryzyka (ostrzegać):** umowa lub działalność „dla pozoru”, podwyższenie podstawy w ciąży, brak ubezpieczenia
   w dniu porodu (koniec umowy, wyrejestrowanie, zawieszenie działalności), zadłużenie składkowe.
@@ -386,6 +387,8 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 - [x] Reguła zasiłku chorobowego w ciąży (kod B, okres wyczekiwania, 33/14 dni, 270 dni, kto wypłaca). _(22.11.2026)_
   (2b: status, okres, stawka i kto wypłaca; `kwota: null` – złotówki w 2c; sprawa Anny: przysługuje od 23.03.2025, ZUS)
 - [ ] Indywidualna podstawa wymiaru: pracownik (z miesięcy z Z-3), zleceniobiorca, działalność (art. 48a).
+  (2c _(22.11.2026)_: pracownik z Z-3 i kwota zasiłku chorobowego gotowe, parametry 2024–2025, działalność tylko w prostym
+  przypadku (12 miesięcy, próg 60%); art. 48a – bez kwoty z ostrzeżeniem; zleceniobiorca (Z-3a) – do zrobienia)
 - [ ] Porównanie z decyzją ZUS + `tests/golden/run` z tabelą zgodności.
 - **Gotowe, gdy:** sprawa Anny daje „przysługuje”, zgodnie z decyzją ZUS.
 

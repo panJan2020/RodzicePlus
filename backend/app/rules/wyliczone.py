@@ -4,29 +4,15 @@ ubezpieczenie chorobowe w dniu zdarzenia (B7).
 Wartości liczymy przy odczycie z AKTYWNYCH faktów – nie zapisujemy ich w polach osoby, więc zmiana
 dowolnego faktu (np. przełączenie źródła) od razu zmienia wynik.
 """
-from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from app.dates import dodaj_miesiace, jako_date, tekst_daty  # noqa: F401 – re-eksport dla reguł
+
 # Tytuły, z których ubezpieczenie chorobowe jest dobrowolne (B4 / B4a).
 TYTULY_DOBROWOLNE = ("zlecenie", "dzialalnosc", "wspolpraca")
 UMOWY_PRZEDLUZANE = ("okreslony", "probny")  # art. 177 §3 KP; zastępstwo – nie (§3¹)
-
-
-def jako_date(v: Any) -> date | None:
-    return date.fromisoformat(str(v)[:10]) if v else None
-
-
-def tekst_daty(d: date) -> str:
-    return d.strftime("%d.%m.%Y")
-
-
-def dodaj_miesiace(d: date, n: int) -> date:
-    """Ten sam dzień n miesięcy później (koniec miesiąca, gdy takiego dnia nie ma)."""
-    m = d.month - 1 + n
-    rok, mies = d.year + m // 12, m % 12 + 1
-    return date(rok, mies, min(d.day, monthrange(rok, mies)[1]))
 
 
 def data_zdarzenia(f: dict[str, Any]) -> date | None:

@@ -249,3 +249,18 @@ def test_druk_z3_nie_ma_liczby_dni_wynagrodzenia_tylko_okresy():
     z3 = schemat_odczytu("Z-3")["properties"]
     assert "wynagrodzenie_chorobowe_okres" in z3
     assert "dni_wynagr_chorobowego_rok" not in z3["pola"]["items"]["properties"]["pole"]["enum"]
+
+
+def test_poswiadczenie_podstawy_skladek_dzialalnosc_i_prog_60_proc_art48():
+    s = _sprawa()
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="poswiadczenie_ubezpieczenia", strony=[7, 8]), {
+        "pola": [{"pole": "podstawa_60_proc", "wartosc": "nie", "strona": 2, "pewnosc": 0.9}],
+        "podstawa_deklarowana": [
+            {"miesiac": "2026-04", "podstawa": 5652, "wakacje_skladkowe": False, "strona": 1, "pewnosc": 0.9},
+            {"miesiac": "2025-12", "podstawa": 1399.8, "wakacje_skladkowe": True, "strona": 1, "pewnosc": 0.8}]})
+    matka = s.osoby[0]
+    assert matka.wartosc("podstawa_60_proc") is False
+    assert matka.wartosc("podstawa_deklarowana") == [
+        {"miesiac": "2026-04", "podstawa": "5652.00", "wakacje_skladkowe": False},
+        {"miesiac": "2025-12", "podstawa": "1399.80", "wakacje_skladkowe": True}]
+    assert matka.aktywna("podstawa_deklarowana").pewnosc == 0.8                    # najniższa z wierszy

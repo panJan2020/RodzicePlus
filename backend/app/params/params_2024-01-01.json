@@ -1,0 +1,127 @@
+{
+  "obowiazuje_od": "2024-01-01",
+  "opis": "Parametry prawne od 2024-01-01 do 2024-06-30. Źródła i status weryfikacji każdej wartości: klucz _zrodla.",
+  "urlop_macierzynski_tyg": {
+    "1": 20,
+    "2": 31,
+    "3": 33,
+    "4": 35,
+    "5": 37
+  },
+  "urlop_na_warunkach_min_tyg": 9,
+  "urlop_rodzicielski_tyg": {
+    "1": 41,
+    "2": 43
+  },
+  "urlop_rodzicielski_za_zyciem_tyg": {
+    "1": 65,
+    "2": 67
+  },
+  "urlop_rodzicielski_przyjecie_szczegolny_tyg": 38,
+  "urlop_rodzicielski_przyjecie_szczegolny_za_zyciem_tyg": 62,
+  "rodzicielski_nieprzenoszalne_tyg": 9,
+  "rodzicielski_max_czesci": 5,
+  "rodzicielski_do_konca_roku_wieku_dziecka": 6,
+  "laczenie_max_wymiar": 0.5,
+  "laczenie_limit_tyg": {
+    "1": 82,
+    "2": 86
+  },
+  "laczenie_limit_za_zyciem_tyg": {
+    "1": 130,
+    "2": 134
+  },
+  "urlop_ojcowski_tyg": 2,
+  "urlop_ojcowski_max_czesci": 2,
+  "urlop_ojcowski_do_miesiecy_zycia": 12,
+  "macierzynski_przed_porodem_max_tyg": 6,
+  "macierzynski_tylko_matka_tyg": 14,
+  "macierzynski_min_po_porodzie_tyg": 8,
+  "martwe_urodzenie_tyg": 8,
+  "zgon_min_dni": 7,
+  "uzupelniajacy": {
+    "prog_tydzien_wczesny": 28,
+    "prog_tydzien_donoszony": 37,
+    "prog_masa_g": 1000,
+    "limit_tyg_wczesny": 15,
+    "limit_tyg_pozostale": 8,
+    "donoszony_od_dnia": 5,
+    "donoszony_pierwszy_dzien_do": 28,
+    "donoszony_min_dni_kolejnych": 2
+  },
+  "stawki": {
+    "macierzynski": 1.0,
+    "na_warunkach": 1.0,
+    "uzupelniajacy": 1.0,
+    "ojcowski": 1.0,
+    "rodzicielski": 0.7,
+    "jednolita": 0.815,
+    "nieprzenoszalna_drugi_rodzic": 0.7,
+    "chorobowy": 0.8,
+    "chorobowy_ciaza": 1.0,
+    "rehabilitacyjne_pierwsze_3_mies": 0.9,
+    "rehabilitacyjne_dalej": 0.75,
+    "rehabilitacyjne_ciaza": 1.0,
+    "opiekunczy": 0.8
+  },
+  "wniosek_jednolita_dni": 21,
+  "skladki_pracownika_proc": 0.1371,
+  "minimalne_wynagrodzenie": 4242.0,
+  "max_podstawa_dobrowolne_brutto": 19560.0,
+  "swiadczenie_rodzicielskie": 1000.0,
+  "prog_zadluzenia_proc_min_wyn": 0.01,
+  "duzy_platnik_powyzej": 20,
+  "wyczekiwanie_dni": {
+    "obowiazkowe": 30,
+    "dobrowolne": 90
+  },
+  "okres_zasilkowy_dni": {
+    "standard": 182,
+    "ciaza": 270,
+    "po_ustaniu": 91
+  },
+  "wynagrodzenie_chorobowe_dni": {
+    "standard": 33,
+    "po_50": 14
+  },
+  "wynagrodzenie_chorobowe_wiek": 50,
+  "kod_ezla_ciaza": "B",
+  "dzielnik_dzienny": 30,
+  "prog_pewnosci_ai": 0.6,
+  "okres_obliczeniowy_mies": 12,
+  "art38_min_czesc_czasu_pracy": 0.5,
+  "art43_przerwa_mies": 1,
+  "ciaza_tyg": 40,
+  "przedluzenie_umowy_po_miesiacu_ciazy": 3,
+  "uwagi": {
+    "swiadczenie_rodzicielskie": "1000 zl – przepisane z 2026, do weryfikacji"
+  },
+  "obowiazuje_do": "2024-06-30",
+  "art45_niepelny_etat": "proporcjonalnie",
+  "_zrodla": {
+    "minimalne_wynagrodzenie": {
+      "wartosc": 4242.0,
+      "podstawa_prawna": "rozporządzenie Rady Ministrów z 14.09.2023 r. w sprawie wysokości minimalnego wynagrodzenia za pracę oraz minimalnej stawki godzinowej w 2024 r. (Dz.U. 2023 poz. 1893): 4242 zł od 1.01.2024",
+      "zrodlo": "https://eli.gov.pl/api/acts/DU/2023/1893/text/I/D20231893.pdf",
+      "status": "zweryfikowane"
+    },
+    "max_podstawa_dobrowolne_brutto": {
+      "wartosc": 19560.0,
+      "podstawa_prawna": "250% prognozowanego przeciętnego wynagrodzenia (komunikat Prezesa ZUS)",
+      "zrodlo": "https://www.pit.pl/?p=10585 (źródło wtórne; sprawdzić komunikat Prezesa ZUS z grudnia 2023)",
+      "status": "do_weryfikacji"
+    },
+    "art45_niepelny_etat": {
+      "wartosc": "proporcjonalnie",
+      "podstawa_prawna": "art. 45 ust. 1 ustawy zasiłkowej mówi o „pracy w pełnym wymiarze czasu pracy”; proporcja dla niepełnego etatu pochodzi z komentarzy (infor.pl, poradnikprzedsiebiorcy.pl)",
+      "zrodlo": "https://kadry.infor.pl/kadry/ubezpieczenia/zasilki_i_inne_swiadczenia/54080,Minimalne-wynagrodzenie-podstawa-wymiaru-zasilku-chorobowego.html",
+      "status": "do_weryfikacji",
+      "uwaga": "wartości: proporcjonalnie | brak (minimum tylko przy pełnym etacie); pytanie 15 w sekcji Z"
+    },
+    "pozostale": {
+      "podstawa_prawna": "przepisane z params_2026.json; nie sprawdzone dla tego roku (stałe w latach 2024–2026 wg wiedzy zespołu, bez potwierdzenia w tekście aktu) – patrz docs/pytania_kalkulator.md, sekcja Z",
+      "zrodlo": "params_2026.json",
+      "status": "do_weryfikacji"
+    }
+  }
+}

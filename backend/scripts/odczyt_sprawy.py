@@ -18,7 +18,7 @@ from app.calculator.okresy_chorobowe import poczatek_niezdolnosci
 from app.domain.model import Kanal, Rola, Sprawa, WartoscPola, Wystawca
 from app.extraction import pipeline
 from app.merge.scalanie import prog_pewnosci
-from app.params.store import get_params
+from app.params.store import parametry_na_dzien
 from app.questions import engine
 from app.rules.wspolne import Kontekst
 from app.rules.zasilek_chorobowy_ciaza import zasilek_chorobowy_ciaza
@@ -35,15 +35,21 @@ def _wynik_reguly(s: Sprawa) -> None:
     merge.dodaj(s, matka, "sytuacja", WartoscPola(wartosc=["ciaza"], wystawca=Wystawca.UZYTKOWNIK,
                                                    kanal=Kanal.KREATOR, zrodlo_opis="skrypt"), rodzaj="fakt")
     f, pochodzenie = engine.fakty_z_pochodzeniem(s, matka)
-    p = get_params(poczatek_niezdolnosci(f))
+    p, ostrzezenie_parametrow = parametry_na_dzien(poczatek_niezdolnosci(f))
     w = zasilek_chorobowy_ciaza(Kontekst(fakty=f, pochodzenie=pochodzenie, dzis=date.today(),
                                          prog_pewnosci=prog_pewnosci()), p)[0]
+    if ostrzezenie_parametrow:
+        w.uwagi.insert(0, ostrzezenie_parametrow)
     print("\n## Zasiłek chorobowy w ciąży (reguła 2b)")
     print(f"- status: {w.status.value}{' (orientacyjny)' if w.orientacyjny else ''}")
     print(f"- {w.podsumowanie}")
     if w.okres:
         print(f"- zasiłek: {w.okres.od:%d.%m.%Y}–{w.okres.do:%d.%m.%Y}, {w.okres.dni} dni, stawka {w.stawka}, "
               f"kto wypłaca: {w.kto_wyplaca}")
+    if w.kwota:
+        k = w.kwota
+        print(f"- kwota: podstawa {k.podstawa_wymiaru} zł, stawka {k.stawka}, dziennie {k.stawka_dzienna} zł, "
+              f"za okres {k.za_okres} zł brutto (parametry od {p['obowiazuje_od']})")
     if w.okres_wynagrodzenia:
         o = w.okres_wynagrodzenia
         print(f"- wynagrodzenie pracodawcy: {o.od:%d.%m.%Y}–{o.do:%d.%m.%Y}, {o.dni} dni")

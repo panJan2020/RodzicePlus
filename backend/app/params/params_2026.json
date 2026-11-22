@@ -1,18 +1,36 @@
 {
   "obowiazuje_od": "2026-01-01",
   "opis": "Parametry prawne – edytowalne w panelu admina (docs/opis_aplikacji.md, rozdz. 10). Zrodla: zalacznik ZUS, KP, ustawa zasilkowa.",
-  "urlop_macierzynski_tyg": {"1": 20, "2": 31, "3": 33, "4": 35, "5": 37},
+  "urlop_macierzynski_tyg": {
+    "1": 20,
+    "2": 31,
+    "3": 33,
+    "4": 35,
+    "5": 37
+  },
   "urlop_na_warunkach_min_tyg": 9,
-  "urlop_rodzicielski_tyg": {"1": 41, "2": 43},
-  "urlop_rodzicielski_za_zyciem_tyg": {"1": 65, "2": 67},
+  "urlop_rodzicielski_tyg": {
+    "1": 41,
+    "2": 43
+  },
+  "urlop_rodzicielski_za_zyciem_tyg": {
+    "1": 65,
+    "2": 67
+  },
   "urlop_rodzicielski_przyjecie_szczegolny_tyg": 38,
   "urlop_rodzicielski_przyjecie_szczegolny_za_zyciem_tyg": 62,
   "rodzicielski_nieprzenoszalne_tyg": 9,
   "rodzicielski_max_czesci": 5,
   "rodzicielski_do_konca_roku_wieku_dziecka": 6,
   "laczenie_max_wymiar": 0.5,
-  "laczenie_limit_tyg": {"1": 82, "2": 86},
-  "laczenie_limit_za_zyciem_tyg": {"1": 130, "2": 134},
+  "laczenie_limit_tyg": {
+    "1": 82,
+    "2": 86
+  },
+  "laczenie_limit_za_zyciem_tyg": {
+    "1": 130,
+    "2": 134
+  },
   "urlop_ojcowski_tyg": 2,
   "urlop_ojcowski_max_czesci": 2,
   "urlop_ojcowski_do_miesiecy_zycia": 12,
@@ -48,14 +66,24 @@
   },
   "wniosek_jednolita_dni": 21,
   "skladki_pracownika_proc": 0.1371,
-  "minimalne_wynagrodzenie": 4806.00,
-  "max_podstawa_dobrowolne_brutto": 23550.00,
-  "swiadczenie_rodzicielskie": 1000.00,
+  "minimalne_wynagrodzenie": 4806.0,
+  "max_podstawa_dobrowolne_brutto": 23550.0,
+  "swiadczenie_rodzicielskie": 1000.0,
   "prog_zadluzenia_proc_min_wyn": 0.01,
   "duzy_platnik_powyzej": 20,
-  "wyczekiwanie_dni": {"obowiazkowe": 30, "dobrowolne": 90},
-  "okres_zasilkowy_dni": {"standard": 182, "ciaza": 270, "po_ustaniu": 91},
-  "wynagrodzenie_chorobowe_dni": {"standard": 33, "po_50": 14},
+  "wyczekiwanie_dni": {
+    "obowiazkowe": 30,
+    "dobrowolne": 90
+  },
+  "okres_zasilkowy_dni": {
+    "standard": 182,
+    "ciaza": 270,
+    "po_ustaniu": 91
+  },
+  "wynagrodzenie_chorobowe_dni": {
+    "standard": 33,
+    "po_50": 14
+  },
   "wynagrodzenie_chorobowe_wiek": 50,
   "kod_ezla_ciaza": "B",
   "dzielnik_dzienny": 30,
@@ -68,5 +96,33 @@
   "uwagi": {
     "swiadczenie_rodzicielskie": "1000 zl - do potwierdzenia na 2026 (docs/pytania_kalkulator.md, Z.2)",
     "ciaza_tyg": "przyblizenie: poczatek ciazy = przewidywana data porodu minus 40 tygodni (art. 177 par. 3 KP)"
+  },
+  "obowiazuje_do": "2026-12-31",
+  "art45_niepelny_etat": "proporcjonalnie",
+  "_zrodla": {
+    "minimalne_wynagrodzenie": {
+      "wartosc": 4806.0,
+      "podstawa_prawna": "minimalne wynagrodzenie 2026 – z materiałów zespołu (załącznik ZUS)",
+      "zrodlo": "docs/pytania_kalkulator.md, sekcja Y",
+      "status": "do_weryfikacji"
+    },
+    "max_podstawa_dobrowolne_brutto": {
+      "wartosc": 23550.0,
+      "podstawa_prawna": "250% prognozowanego przeciętnego wynagrodzenia w 2026",
+      "zrodlo": "docs/pytania_kalkulator.md, sekcja Y",
+      "status": "do_weryfikacji"
+    },
+    "art45_niepelny_etat": {
+      "wartosc": "proporcjonalnie",
+      "podstawa_prawna": "art. 45 ust. 1 ustawy zasiłkowej mówi o „pracy w pełnym wymiarze czasu pracy”; proporcja dla niepełnego etatu pochodzi z komentarzy",
+      "zrodlo": "https://kadry.infor.pl/kadry/ubezpieczenia/zasilki_i_inne_swiadczenia/54080,Minimalne-wynagrodzenie-podstawa-wymiaru-zasilku-chorobowego.html",
+      "status": "do_weryfikacji",
+      "uwaga": "wartości: proporcjonalnie | brak; pytanie 15 w sekcji Z"
+    },
+    "pozostale": {
+      "podstawa_prawna": "załącznik ZUS, ustawa zasiłkowa, Kodeks pracy",
+      "zrodlo": "docs/pytania_kalkulator.md, sekcja Y",
+      "status": "do_weryfikacji"
+    }
   }
 }

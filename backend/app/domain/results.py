@@ -44,8 +44,8 @@ class OkresWyniku(BaseModel):
 class KwotaWyniku(BaseModel):
     miesieczna: str
     za_okres: str
-    stawka: str
-    stawka_dzienna: str
+    stawka: str | None               # None – różne stawki w częściach okresu (zasiłek chorobowy: kod B tylko w części)
+    stawka_dzienna: str | None       # j.w.
     podstawa_wymiaru: str
     brutto: bool = True
 

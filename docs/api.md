@@ -327,6 +327,8 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "okres_wynagrodzenia": null,     // zasiłek chorobowy pracownika: {"od","do","dni"} – wynagrodzenie płacone przez pracodawcę
  "kwota": {"miesieczna": "7075.78", "za_okres": "33020.40", "stawka": "1.00", "stawka_dzienna": "235.86",
            "podstawa_wymiaru": "7075.78", "brutto": true},                  // null, gdy brakuje danych do kwoty
+                                  // zasiłek chorobowy: "stawka" i "stawka_dzienna" = null, gdy w części okresu są różne stawki
+                                  // (kod B tylko w części zwolnienia); "za_okres" to wtedy suma części
  "kto_wyplaca": "platnik",        // zus | platnik | null (nie wiemy – C1 „nie wiem”; tekst w kto_wyplaca_opis)
  "kto_wyplaca_opis": "Zasiłek wypłaci pracodawca – zgłasza do ubezpieczenia chorobowego ponad 20 osób (art. 61 ustawy zasiłkowej).",
  "gdzie_zlozyc": "U pracodawcy: wniosek o zasiłek macierzyński (ZAM) złóż w kadrach.",

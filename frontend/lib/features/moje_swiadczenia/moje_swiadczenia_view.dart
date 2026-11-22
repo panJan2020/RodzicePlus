@@ -215,7 +215,9 @@ class _OkresIKwota extends StatelessWidget {
       if (k != null) ...[
         ('Miesięcznie', '${formatujKwote(k.miesieczna)} brutto'),
         ('Za cały okres', '${formatujKwote(k.zaOkres)} brutto'),
-        ('Stawka', '${formatujProcent(k.stawka)} podstawy · ${formatujKwote(k.stawkaDzienna)} dziennie'),
+        ('Stawka', k.stawka == null
+            ? 'różna w częściach okresu (zależnie od kodu zwolnienia)'
+            : '${formatujProcent(k.stawka!)} podstawy${k.stawkaDzienna == null ? '' : ' · ${formatujKwote(k.stawkaDzienna!)} dziennie'}'),
         ('Podstawa wymiaru', formatujKwote(k.podstawaWymiaru)),
       ],
     ];

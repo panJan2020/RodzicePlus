@@ -15,7 +15,7 @@ from typing import Any
 from app.domain.model import Wystawca
 from app.questions.engine import pola_z_dokumentow
 
-WERSJA = "2a-8"            # odczyt pól
+WERSJA = "2a-9"            # odczyt pól
 WERSJA_KLASYFIKACJI = "k2"  # klasyfikacja stron  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
 
 
@@ -148,6 +148,11 @@ _TABELE: dict[str, dict[str, Any]] = {
         "tytul": _enum(TYTULY), "platnik": _null({"type": "string"}),
         "od": _DATA, "do": _null(_DATA), "chorobowe": _null({"type": "boolean"}),
         "chorobowe_dobrowolne": _null({"type": "boolean"})}),
+    # Q1 – poświadczenie ZUS, pkt 4: podstawa składki chorobowej za każdy miesiąc (działalność)
+    "podstawa_deklarowana": _wiersz({
+        "miesiac": {"type": "string", "description": "RRRR-MM"},
+        "podstawa": {"type": "number", "description": "podstawa wymiaru składki na ubezpieczenie chorobowe"},
+        "wakacje_skladkowe": {"type": "boolean", "description": "zaznaczono wakacje składkowe"}}),
     # O4 – Z-3, „Składniki wynagrodzenia”; 0 = nie ma w dokumencie
     "miesiace": _wiersz({
         "miesiac": {"type": "string", "description": "RRRR-MM"},

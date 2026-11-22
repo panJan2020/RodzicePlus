@@ -607,23 +607,23 @@ class KwotaWyniku {
   const KwotaWyniku({
     required this.miesieczna,
     required this.zaOkres,
-    required this.stawka,
-    required this.stawkaDzienna,
+    this.stawka,
+    this.stawkaDzienna,
     required this.podstawaWymiaru,
     this.brutto = true,
   });
   final String miesieczna;
   final String zaOkres;
-  final String stawka;
-  final String stawkaDzienna;
+  final String? stawka; // null – różne stawki w częściach okresu (zasiłek chorobowy: kod B tylko w części)
+  final String? stawkaDzienna; // j.w.
   final String podstawaWymiaru;
   final bool brutto;
 
   factory KwotaWyniku.fromJson(Map<String, dynamic> j) => KwotaWyniku(
         miesieczna: j['miesieczna'] as String,
         zaOkres: j['za_okres'] as String,
-        stawka: j['stawka'] as String,
-        stawkaDzienna: j['stawka_dzienna'] as String,
+        stawka: j['stawka'] as String?,
+        stawkaDzienna: j['stawka_dzienna'] as String?,
         podstawaWymiaru: j['podstawa_wymiaru'] as String,
         brutto: j['brutto'] as bool? ?? true,
       );

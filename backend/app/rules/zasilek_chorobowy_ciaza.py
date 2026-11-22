@@ -19,8 +19,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from app.calculator import okresy_chorobowe as oc
-from app.domain.results import OkresWyniku, Powod, Status, Warunek
+from app.calculator import kwoty, okresy_chorobowe as oc
+from app.calculator import podstawa as pw
+from app.domain.results import KwotaWyniku, OkresWyniku, Powod, Status, Warunek
+from app.formaty import kwota_tekst
 from app.rules import wyliczone
 from app.rules.wspolne import Kontekst, WynikReguly, dni_tekst, kto_wyplaca, pola_niepewne
 
@@ -209,6 +211,10 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
                        f"{int(Decimal(str(p['stawki']['chorobowy_ciaza'])) * 100)}% podstawy, bez niego "
                        f"{int(domyslna * 100)}% – na razie pokazujemy stawkę orientacyjną.")
 
+    # ---- 6b. podstawa wymiaru i kwota zasiłku ----
+    if r.zasilek:
+        _kwota(w, {**f, "tytuly": [t.tytul]}, poczatek, stawki, brak_kodu, p)
+
     # ---- 7. ostrzeżenia ----
     if f.get("praca_na_zwolnieniu") is True:
         w.ryzyka.append("praca_na_zwolnieniu")
@@ -250,10 +256,56 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
     else:
         w.status = Status.PRZYSLUGUJE
     poczatek_zdania = "Przysługuje Ci, o ile zwolnienie potrwa," if przyszle else "Przysługuje Ci"
+    kwota_zdania = (f" – {kwota_tekst(w.kwota.za_okres)} brutto{' (orientacyjnie)' if w.orientacyjny else ''}"
+                    if w.kwota else "")
     w.podsumowanie = (f"{poczatek_zdania} zasiłek chorobowy od {_d(r.zasilek_od)} do {_d(r.zasilek_do)} "
-                      f"({dni_tekst(len(r.zasilek))}); wypłaci go {KTO[kto]}.")
+                      f"({dni_tekst(len(r.zasilek))}); wypłaci go {KTO[kto]}{kwota_zdania}.")
     w.co_zrobic = _co_zrobic(kto, pracownik, brak_kodu)
+    if w.kwota and any("art. 45" in u for u in w.uwagi):
+        w.co_zrobic.append("Zapytaj w ZUS, czy przy niepełnym etacie podstawa zasiłku jest podnoszona do najniższej "
+                           "podstawy (art. 45 ustawy zasiłkowej).")
     return [w]
+
+
+def _kwota(w: WynikReguly, f: dict[str, Any], poczatek: date, stawki: list[Decimal | None], brak_kodu: bool,
+           p: dict[str, Any]) -> None:
+    """Podstawa wymiaru (art. 36–45, 48) i kwota: stawka dzienna zaokrąglona do groszy × dni, osobno dla każdej stawki.
+
+    Dni bez znanego kodu liczymy po stawce 80% (orientacyjnie), a kwotę przy 100% podajemy w uwagach.
+    Gdy art. 45 przy niepełnym etacie zmienia podstawę, w uwagach jest drugi wariant (niepotwierdzony).
+    """
+    ust = pw.ustal_podstawe(f, poczatek, p)
+    w.brakujace += [b for b in ust.brakujace if b not in w.brakujace]
+    w.uwagi += ust.uwagi
+    w.orientacyjny = w.orientacyjny or ust.orientacyjny
+    if ust.minimum_zmienia:
+        w.pola_do_potwierdzenia = list(dict.fromkeys(w.pola_do_potwierdzenia + ["etat"]))
+    if ust.kwota is None:
+        return
+    nizsza, pelna = Decimal(str(p["stawki"]["chorobowy"])), Decimal(str(p["stawki"]["chorobowy_ciaza"]))
+    jak_dotad = [s if s is not None else nizsza for s in stawki]
+    jak_z_kodem_b = [s if s is not None else pelna for s in stawki]
+    suma, grupy = kwoty.kwota_za_dni(ust.kwota, jak_dotad, p)
+    glowna, jedna = max(grupy, key=lambda g: g.dni), len(grupy) == 1
+    w.kwota = KwotaWyniku(miesieczna=str(kwoty.miesieczny(ust.kwota, glowna.stawka)), za_okres=str(suma),
+                          stawka=f"{glowna.stawka:.2f}" if jedna else None,
+                          stawka_dzienna=str(glowna.dzienna) if jedna else None, podstawa_wymiaru=str(ust.kwota))
+    if brak_kodu:
+        przy_b, _ = kwoty.kwota_za_dni(ust.kwota, jak_z_kodem_b, p)
+        w.uwagi.append(f"Przy kodzie „B” zasiłek wyniósłby {kwota_tekst(przy_b)} brutto (stawka "
+                       f"{int(pelna * 100)}% podstawy).")
+    if ust.alternatywa is not None:
+        bez_minimum = p.get("art45_niepelny_etat", "proporcjonalnie") == "proporcjonalnie"
+        etykieta = "bez najniższej podstawy" if bez_minimum else "z najniższą podstawą proporcjonalną do etatu"
+        alt, _ = kwoty.kwota_za_dni(ust.alternatywa, jak_dotad, p)
+        tekst = f"Wariant niepotwierdzony ({etykieta}): podstawa {kwota_tekst(ust.alternatywa)}, zasiłek "
+        if brak_kodu:
+            alt_b, _ = kwoty.kwota_za_dni(ust.alternatywa, jak_z_kodem_b, p)
+            tekst += (f"{kwota_tekst(alt)} brutto przy stawce {int(nizsza * 100)}% albo {kwota_tekst(alt_b)} "
+                      f"przy kodzie „B” ({int(pelna * 100)}%).")
+        else:
+            tekst += f"{kwota_tekst(alt)} brutto."
+        w.uwagi.append(tekst)
 
 
 def _gdzie_zlozyc(kto: str | None, pracownik: bool) -> str:

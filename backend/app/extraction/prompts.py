@@ -45,6 +45,13 @@ Tytuł ubezpieczenia (okresy_ubezpieczenia, tytuly, chorobowe):
 - Jeśli kodu nie widać albo jest nieczytelny – kod_tytulu = null, a pewność tego wpisu poniżej 0.6.
 - Okres bez daty końca (ubezpieczenie trwa) – „do” = null."""
 
+PODSTAWY = """
+Poświadczenie ubezpieczenia – podstawy składek (działalność):
+- podstawa_deklarowana: tabela „Podstawa wymiaru składek na ubezpieczenie chorobowe za okres 12 miesięcy…” (pkt 4) –
+  jeden wiersz na miesiąc (RRRR-MM): kwota podstawy i czy zaznaczono „wakacje składkowe”.
+- podstawa_60_proc (pkt 11): odpowiedź „tak” albo „nie” na pytanie, czy w całym okresie podstawa wynosiła co najmniej
+  60% prognozowanego przeciętnego wynagrodzenia. Gdy takiego pytania na dokumencie nie ma – nie dodawaj wpisu."""
+
 ZRZUT = """
 Zrzut z systemu ZUS to tabela(e) okresów ubezpieczenia, często obrócona o 90°. Przepisz każdy wiersz okresu
 (od, do, kod tytułu, płatnik) do „okresy_ubezpieczenia”; „chorobowe_od” to początek nieprzerwanego ubezpieczenia
@@ -79,4 +86,5 @@ Odczytaj z niego pola ze schematu. Zasady:
 - platnik_ponad_20: „ponad_20”, gdy dokument wskazuje, że płatnik zgłasza do ubezpieczenia chorobowego
   ponad 20 osób, „do_20” – gdy 20 lub mniej; jeśli dokument tego nie mówi – pusta lista.""" + (
         TYTUL_Z_KODU + (ZRZUT if t.kod == "zrzut_systemu_ZUS" else "")
-        if t.kod in ("poswiadczenie_ubezpieczenia", "zrzut_systemu_ZUS") else "")
+        if t.kod in ("poswiadczenie_ubezpieczenia", "zrzut_systemu_ZUS") else "") + (
+        PODSTAWY if t.kod == "poswiadczenie_ubezpieczenia" else "")

@@ -207,7 +207,7 @@ Pytania wspólne: G4 („Za życiem”), J2 (81,5% liczone od przyjęcia), L1–
 | O7 | Czy w tym okresie zmienił się wymiar etatu? Kiedy? | `zmiana_etatu{data, nowy}` | rodzic | fakt | jw. | podstawa według nowego wymiaru (art. 40) | zus_konto, upload:Z-3 (pkt 1), kreator |
 | O8 | Czy u tego pracodawcy masz też umowę zlecenia lub o dzieło? Kwoty za kolejne miesiące | `umowy_u_pracodawcy[]` | rodzic | fakt | jw. | przychód wliczany do podstawy | upload:Z-3 (pkt 5 „Składniki”), kreator |
 
-Reguły bez pytań: podstawa przy pełnym etacie nie niższa niż minimalne wynagrodzenie minus 13,71% (art. 45);
+Reguły bez pytań: podstawa przy pełnym etacie nie niższa niż minimalne wynagrodzenie minus 13,71% (art. 45 ust. 1); przy niepełnym etacie parametr `art45_niepelny_etat` (`proporcjonalnie` – domyślnie, z komentarzy, albo `brak`); gdy ta reguła zmienia podstawę, wynik jest orientacyjny, a w uwagach jest drugi wariant (sekcja Z, pyt. 15);
 dzienna stawka = 1/30 podstawy (art. 36 ust. 3).
 
 ## P. Podstawa wymiaru – zleceniobiorca
@@ -223,10 +223,11 @@ dzienna stawka = 1/30 podstawy (art. 36 ust. 3).
 
 | ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
 |---|---|---|---|---|---|---|---|
-| Q1 | Zadeklarowana podstawa składki chorobowej za każdy z ostatnich 12 miesięcy | `podstawa_deklarowana[]` | rodzic | fakt | B1 ∋ działalność | średnia minus 13,71%; limit maksymalnej podstawy (parametr) | zus_konto, upload:Z-3b (archiwalny), upload:poswiadczenie, kreator (tryb uproszczony `Q1s`) |
+| Q1 | Podstawa składki chorobowej za każdy z ostatnich 12 miesięcy (miesiąc, kwota, wakacje składkowe) | `podstawa_deklarowana[]` `{miesiac, podstawa, wakacje_skladkowe}` | rodzic | fakt | B1 ∋ działalność | średnia z 12 miesięcy minus 13,71%, z limitem maksymalnej podstawy (parametr). **W próbce z działalnością tabela jest w poświadczeniu ZUS (pkt 4), nie w Z-3b** (Z-3b z próbki nie ma pól o podstawie) | zus_konto, upload:poswiadczenie (pkt 4), upload:Z-3b (archiwalny) |
 | Q1s | (tryb uproszczony Q1) Średnia zadeklarowana podstawa składki chorobowej z ostatnich 12 miesięcy | `podstawa_deklarowana_srednia` | rodzic | fakt | B1 ∋ działalność i brak `podstawa_deklarowana[]` | podstawa wymiaru w przybliżeniu → wynik **orientacyjny** | zus_konto, kreator |
-| Q2 | Rodzaj składek: standardowe / preferencyjne / mały ZUS+ / dobrowolnie wyższa podstawa | `rodzaj_skladek` | rodzic | fakt | jw. | „najniższa podstawa” we wzorze art. 48a (ust. 5) | zus_konto, kreator |
-| Q3 | Liczba pełnych miesięcy ubezpieczenia chorobowego z tytułu działalności | `miesiace_ubezpieczenia` | rodzic | **wyliczone** (z B5) / zus | jw. | poniżej 12 → wzór art. 48a: najniższa podstawa + (nadwyżka ÷ 12) × liczba miesięcy | wyliczone, zus_konto |
+| Q2 | Rodzaj składek: standardowe / preferencyjne / mały ZUS+ / dobrowolnie wyższa podstawa | `rodzaj_skladek` | rodzic | fakt | jw. | potrzebne do art. 48a (najniższa podstawa) – wzór **do potwierdzenia z aktualnym tekstem ustawy** (sekcja Z, pyt. 17) | zus_konto, kreator |
+| Q3 | Liczba pełnych miesięcy ubezpieczenia chorobowego z tytułu działalności | `miesiace_ubezpieczenia` | rodzic | **wyliczone** (z B5) / zus | jw. | poniżej 12 → może mieć zastosowanie art. 48a (obowiązuje od 1.01.2016; orzecznictwo SN: II USKP 227/21, III UK 193/19) – dotyczy osób niebędących pracownikami, gdy ubezpieczenie chorobowe zaczęło się po raz pierwszy lub po przerwie. **Wzór nie jest potwierdzony – w 2c kwoty w tym przypadku nie liczymy**, tylko ostrzegamy | wyliczone, zus_konto |
+| Q6 | Czy w całym okresie ubezpieczenia podstawa składki chorobowej wynosiła co najmniej 60% prognozowanego przeciętnego wynagrodzenia? | `podstawa_60_proc` | rodzic | fakt | B1 ∋ działalność | nie → może mieć zastosowanie art. 48a, więc kwoty nie liczymy (poświadczenie ZUS, pkt 11; znaczenie progu do wyjaśnienia – sekcja Z, pyt. 18) | upload:poswiadczenie, kreator |
 | Q4 | Czy były przerwy w ubezpieczeniu z powodu nieopłacenia albo spóźnienia składki? | `przerwy_skladkowe[]` | rodzic | fakt | jw. | uwzględnia się wtedy także miesiące sprzed przerwy (art. 48a ust. 4) | zus_konto, kreator |
 | Q5 | Czy w okresie obliczeniowym były miesiące, w których przez zasiłki prowadziłaś działalność krócej niż pół miesiąca? | `miesiace_niepelne[]` | rodzic | fakt / wyliczone z zus_historia | jw. | wyłączenie z podstawy (art. 50) | zus_historia, kreator |
 
@@ -375,8 +376,9 @@ Każda wersja ma `obowiazuje_od`. Do wyliczeń bierzemy wersję obowiązującą 
 | Wynagrodzenie chorobowe | 33 dni / 14 dni (50+) |
 | Świadczenie rehabilitacyjne | maks. 12 mies.; kwartalny wskaźnik waloryzacji |
 | Składki odliczane od podstawy | 13,71% |
-| Minimalne wynagrodzenie 2026 | 4 806 zł → minimalna podstawa 4 147,10 zł |
-| Maks. podstawa przy dobrowolnym ubezpieczeniu 2026 | 23 550 zł → 20 321,30 zł |
+| Minimalne wynagrodzenie 2024 / 2025 / 2026 | 4 242 zł do 30.06.2024 i 4 300 zł od 1.07.2024 (Dz.U. 2023 poz. 1893) / 4 666 zł (Dz.U. 2024 poz. 1362) / 4 806 zł → minimalna podstawa 4 147,10 zł |
+| Maks. podstawa przy dobrowolnym ubezpieczeniu 2024 / 2025 / 2026 | 19 560 zł (źródło wtórne, do_weryfikacji) / 21 682,50 zł (komunikat ZUS 13.12.2024, kwota ze źródła wtórnego, do_weryfikacji) / 23 550 zł → 20 321,30 zł |
+| Najniższa podstawa przy niepełnym etacie (`art45_niepelny_etat`) | `proporcjonalnie` (× wymiar etatu; z komentarzy) albo `brak`; do_weryfikacji – sekcja Z, pyt. 15. Dotyczy zasiłku chorobowego i macierzyńskiego |
 | Próg zadłużenia | 1% minimalnego wynagrodzenia (48,06 zł); spłata w 6 mies. |
 | Kwota świadczenia rodzicielskiego (podwyższenie) | 1 000 zł (z pisma ZUS w sprawie z 2025 r.); do potwierdzenia na 2026 |
 | Duży płatnik | ponad 20 ubezpieczonych, stan na 30.11 poprzedniego roku |
@@ -389,6 +391,8 @@ Każda wersja ma `obowiazuje_od`. Do wyliczeń bierzemy wersję obowiązującą 
 | Miesiąc pomijany w podstawie (`art38_min_czesc_czasu_pracy`) | przepracowano mniej niż ½ obowiązującego czasu pracy (art. 38 ust. 2) |
 | Ta sama podstawa (`art43_przerwa_mies`) | przerwa między zasiłkami krótsza niż 1 miesiąc kalendarzowy (art. 43) |
 | Przedłużenie umowy do porodu (`ciaza_tyg`, `przedluzenie_umowy_po_miesiacu_ciazy`) | umowa kończąca się po 3. miesiącu ciąży (art. 177 §3 KP); początek ciąży w przybliżeniu = `pdp` − 40 tyg. |
+
+Pliki parametrów: `params_2024-01-01.json`, `params_2024-07-01.json`, `params_2025-01-01.json`, `params_2026.json`. Każdy ma `obowiazuje_od`/`obowiazuje_do` i klucz `_zrodla` (podstawa prawna, źródło i status `zweryfikowane` / `do_weryfikacji` dla każdej wartości rocznej oraz zbiorczo `pozostale` – przepisane z 2026 i niesprawdzone). Brak pliku na rok prawa → widoczne ostrzeżenie w wyniku (CLAUDE.md, zasada 15).
 
 Parametry z poprzednich lat (np. minimalne wynagrodzenie 2025 dla spraw testowych z 2025 r.) dodajemy jako osobne
 wersje z wcześniejszym `obowiazuje_od`, bo sprawy ZUS dotyczą różnych lat.
@@ -413,3 +417,9 @@ Pytania o prawo i wyliczenia. Pytania o demo i zakres: `docs/opis_aplikacji.md`,
 12. **Przerwy między zwolnieniami:** jak liczyć okres zasiłkowy i 33 dni, gdy między zwolnieniami są dni bez zwolnienia (przerwa do 60 dni sumuje okresy)? Dziś liczymy tylko dni objęte zwolnieniem i ostrzegamy o przerwie.
 13. **Granica 50 lat dla 14 dni wynagrodzenia:** zakładamy 14 dni od roku kalendarzowego następującego po tym, w którym pracownik ukończył 50 lat. Prosimy o potwierdzenie.
 14. **`dni_wynagr_chorobowego_rok` (D3):** druk Z-3 nie ma pola „liczba dni”, tylko okresy od–do (D3a). Czy mamy gdzieś indziej wartość, którą ma zawierać to pole (np. historia świadczeń w ZUS), czy pole usunąć?
+15. **Art. 45 – najniższa podstawa przy niepełnym etacie** (pytanie nr 1): ust. 1 mówi o „pracy w pełnym wymiarze czasu pracy”, a proporcjonalne obniżenie dla niepełnego etatu pochodzi z komentarzy (infor.pl, poradnikprzedsiebiorcy.pl). Czy podstawa przy etacie 0,25 jest podnoszona do 1/4 najniższej podstawy? Parametr `art45_niepelny_etat` (domyślnie `proporcjonalnie`) i drugi wariant w uwagach wyniku.
+16. **Art. 36 ust. 1 – 12 czy 6 miesięcy?** Zostaje 12 (`okres_obliczeniowy_mies`, do_weryfikacji). Nie udało się pobrać aktualnego tekstu (lexlege.pl/pb.pl niedostępne dla narzędzia); api.sejm.gov.pl to tekst z 1999 r. (6 miesięcy, 18,71%) i nie jest źródłem. Prosimy o potwierdzenie na aktualnym tekście jednolitym.
+17. **Art. 48a – aktualny tekst i wzór** (obowiązuje od 1.01.2016; SN II USKP 227/21, III UK 193/19): dotyczy osób niebędących pracownikami, gdy ubezpieczenie chorobowe zaczęło się po raz pierwszy lub po przerwie. Jak dokładnie liczyć podstawę (najniższa podstawa, liczba miesięcy)? Do czasu odpowiedzi: bez kwoty przy ubezpieczeniu krótszym niż 12 miesięcy albo niespełnionym progu 60%.
+18. **Poświadczenie ZUS, pkt 11 (próg 60%)**: jak wynik „NIE” i „ostatni miesiąc poniżej 60%” wpływają na podstawę zasiłku z działalności (w próbce podstawa wzrosła z 1 399,80 zł do 5 652,00 zł w ostatnich 5 miesiącach)? Czy to ten sam mechanizm co art. 48a, czy osobne ograniczenie?
+19. **Parametry 2024 i 2025 do_weryfikacji:** limit 250% prognozowanego wynagrodzenia (19 560 zł; 21 682,50 zł) z komunikatów ZUS oraz wszystkie wartości przepisane z 2026 (wyczekiwanie, okres zasiłkowy, 33/14 dni, stawki, 13,71%). Płaca minimalna 2024 i 2025 jest zweryfikowana w rozporządzeniach.
+20. **Zaokrąglenia stawki dziennej przy 80%:** stosujemy jedno zaokrąglenie (podstawa × stawka ÷ 30), co dla sprawy testowej daje ten sam wynik co „dzienna 100% zaokrąglona, potem × 80%”. Prosimy o potwierdzenie kolejności zaokrągleń ZUS.

@@ -55,6 +55,6 @@ def save_params(data: dict[str, Any]) -> str:
     """Zapisuje nową wersję parametrów (panel admina)."""
     od = date.fromisoformat(data["obowiazuje_od"])
     path = PARAMS_DIR / f"params_{od.isoformat()}.json"
-    clean = {k: v for k, v in data.items() if not k.startswith("_")}
+    clean = {k: v for k, v in data.items() if k != "_plik"}   # „_zrodla”, „_nieweryfikowane” itd. zostają
     path.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
     return path.name

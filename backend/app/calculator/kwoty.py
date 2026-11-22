@@ -4,6 +4,8 @@ Zaokrąglenia jak w ZUS: stawka dzienna do groszy, potem × liczba dni (art. 11 
 Kwota miesięczna to informacja dla użytkownika (podstawa × stawka), pokazywana w groszach.
 """
 from calendar import monthrange
+from collections import Counter
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
@@ -23,6 +25,20 @@ def dzienny(podstawa: Decimal, stawka: float | Decimal, p: dict[str, Any]) -> De
 def za_okres(podstawa: Decimal, stawka: float | Decimal, dni: int, p: dict[str, Any]) -> Decimal:
     """Stawka dzienna (już w groszach) × liczba dni – bez dodatkowego zaokrąglania."""
     return dzienny(podstawa, stawka, p) * dni
+
+
+@dataclass
+class GrupaStawki:
+    stawka: Decimal
+    dni: int
+    dzienna: Decimal
+
+
+def kwota_za_dni(podstawa: Decimal, stawki_dni: list[Decimal], p: dict[str, Any]) -> tuple[Decimal, list[GrupaStawki]]:
+    """Zasiłek chorobowy: stawka dzienna (zaokrąglona do groszy) × liczba dni, osobno dla każdej stawki
+    (np. 100% za dni z kodem B i 80% za pozostałe). `stawki_dni` – stawka każdego dnia zasiłku."""
+    grupy = [GrupaStawki(s, n, dzienny(podstawa, s, p)) for s, n in sorted(Counter(stawki_dni).items(), reverse=True)]
+    return sum((g.dzienna * g.dni for g in grupy), Decimal(0)), grupy
 
 
 def z_podwyzszeniem(kwota_miesieczna: Decimal, p: dict[str, Any]) -> tuple[Decimal, bool]:

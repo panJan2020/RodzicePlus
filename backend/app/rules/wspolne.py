@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.formaty import kwota_tekst  # noqa: F401 – re-eksport dla reguł i testów
 from app.domain.model import Kanal, WartoscPola, Wystawca
 from app.domain.results import KwotaWyniku, OkresWyniku, Powod, Status, Warunek
 
@@ -87,18 +88,6 @@ def gdzie_zlozyc(kto: str | None, f: dict[str, Any]) -> str:
                     "zaświadczenie Z-3.")
         return "W ZUS: wniosek ZAM przez PUE/eZUS albo w placówce."
     return "W kadrach albo w ZUS – zależy, kto wypłaca zasiłek."
-
-
-def kwota_tekst(k: Decimal | str) -> str:
-    """1234.5 → „1 234,50 zł”."""
-    calosc, grosze = f"{Decimal(str(k)):.2f}".split(".")
-    znak = "-" if calosc.startswith("-") else ""
-    calosc = calosc.lstrip("-")
-    grupy = []
-    while calosc:
-        grupy.insert(0, calosc[-3:])
-        calosc = calosc[:-3]
-    return f"{znak}{' '.join(grupy)},{grosze} zł"
 
 
 def dni_tekst(n: int) -> str:

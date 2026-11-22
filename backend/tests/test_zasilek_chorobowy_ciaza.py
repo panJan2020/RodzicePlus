@@ -5,6 +5,7 @@ wynagrodzenie chorobowe od pracodawcy 18.02–22.03 (33 dni), zwolnienia do 27.0
 „Dzisiaj” jest wstrzykiwane (`Kontekst.dzis`), więc testy są deterministyczne.
 """
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 from app.domain.model import Kanal, WartoscPola, Wystawca
 from app.domain.results import Status
 from app.extraction import mapowanie
+from app.formaty import kwota_tekst
 from app.extraction.podzial import Fragment
 from app.main import app
 from app.params.store import get_params
@@ -23,20 +25,41 @@ P = get_params(date(2026, 3, 1))
 DZIS = date(2026, 11, 22)
 c = TestClient(app)
 
+def _miesiac(m, stale):
+    return {"miesiac": m, "skladniki_stale": stale, "skladniki_zmienne": "0.00", "dni_przepracowane": 20,
+            "dni_obowiazujace": 20, "stale_pelna_kwota": None}
+
+
+# Fikcyjne wynagrodzenia (etat 0,25): średnia 1325 zł → po odjęciu 13,71% powyżej najniższej podstawy 2026 × 0,25.
+MIESIACE_WYSOKIE = [_miesiac("2025-10", "1300.00"), _miesiac("2025-11", "1300.00"), _miesiac("2025-12", "1300.00"),
+                    _miesiac("2026-01", "1400.00")]
+
+
 UOP_OD = "2025-10-01"
 OKRES_UOP = {"tytul": "umowa_o_prace", "platnik": "", "od": UOP_OD, "do": None, "chorobowe": None}  # jak w zrzucie ZUS
 ANNA = {
     "sytuacja": ["ciaza"], "tytuly": ["umowa_o_prace"], "okresy_ubezpieczenia": [OKRES_UOP],
     "zatrudnienie_od": UOP_OD, "etat": "0.25", "platnik_ponad_20": {"umowa_o_prace": "do_20"},
-    "data_urodzenia": "1994-05-12",
+    "data_urodzenia": "1994-05-12", "miesiace": MIESIACE_WYSOKIE,
     "ezla": [{"od": "2026-03-08", "do": "2026-05-27", "kod": None}],
     "wynagrodzenie_chorobowe_okres": [{"od": "2026-02-18", "do": "2026-03-22", "kod": None}],
 }
 
 
-def _licz(fakty, dzis=DZIS, pochodzenie=None):
+def niezaleznie(stale, etat, min_wyn, stawka, dni, z_minimum):
+    """Wyliczenie kontrolne bez kodu aplikacji: (podstawa, stawka dzienna, kwota za dni)."""
+    zl = lambda x: x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    netto = sum(map(Decimal, stale)) / len(stale) * (1 - Decimal("0.1371"))
+    if z_minimum:
+        netto = max(netto, Decimal(min_wyn) * (1 - Decimal("0.1371")) * Decimal(etat))
+    podstawa = zl(netto)
+    dzienna = zl(podstawa * Decimal(stawka) / 30)
+    return podstawa, dzienna, dzienna * dni
+
+
+def _licz(fakty, dzis=DZIS, pochodzenie=None, p=P):
     k = Kontekst(fakty=fakty, pochodzenie=pochodzenie or {}, dzis=dzis)
-    wyniki = zasilek_chorobowy_ciaza(k, P)
+    wyniki = zasilek_chorobowy_ciaza(k, p)
     assert len(wyniki) == 1 and wyniki[0].swiadczenie == "zasilek_chorobowy_ciaza"
     return wyniki[0]
 
@@ -60,7 +83,7 @@ def test_anna_przysluguje_od_23_03_zus_art4_art92():
     assert (w.okres.od, w.okres.do, w.okres.dni) == (date(2026, 3, 23), date(2026, 5, 27), 66)
     assert (w.okres_wynagrodzenia.od, w.okres_wynagrodzenia.do, w.okres_wynagrodzenia.dni) == \
         (date(2026, 2, 18), date(2026, 3, 22), 33)
-    assert w.kto_wyplaca == "zus" and "ZUS" in w.podsumowanie and w.kwota is None
+    assert w.kto_wyplaca == "zus" and "ZUS" in w.podsumowanie and w.kwota is not None
     assert "Z-3" in " ".join(w.co_zrobic)                       # ZUS potrzebuje Z-3 od pracodawcy
     assert w.podsumowanie.startswith("Przysługuje Ci zasiłek chorobowy od 23.03.2026 do 27.05.2026 (66 dni)")
 
@@ -280,6 +303,7 @@ def test_od_dokumentow_do_wyniku_przez_merge_i_api_art4_art92():
             {"pole": "platnik_ponad_20", "wartosc": "do_20", "strona": 1, "pewnosc": 0.9}]}
         if pierwszy:
             odczyt["wynagrodzenie_chorobowe_okres"] = [_wiersze("2026-02-18", "2026-03-22")]
+            odczyt["miesiace"] = [{**m, "strona": 3, "pewnosc": 0.9, "stale_pelna_kwota": 0} for m in MIESIACE_WYSOKIE]
             pierwszy = False
         mapowanie.zapisz_dokument(s, "anna.pdf", Fragment(typ="Z-3", strony=[4 * i + 1], osoby=["matka"]), odczyt)
     mapowanie.zapisz_dokument(s, "anna.pdf", Fragment(typ="ZAS-53", strony=[20], osoby=["matka"]),
@@ -298,7 +322,12 @@ def test_od_dokumentow_do_wyniku_przez_merge_i_api_art4_art92():
                                                     {"pole": "data_urodzenia", "wartosc": "1994-05-12"}])
     assert odp.status_code == 200
     wynik = next(w for w in c.get(f"/sprawy/{sid}/swiadczenia").json() if w["swiadczenie"] == "zasilek_chorobowy_ciaza")
-    assert wynik["status"] == "przysluguje" and wynik["kto_wyplaca"] == "zus" and wynik["kwota"] is None
+    assert wynik["status"] == "przysluguje" and wynik["kto_wyplaca"] == "zus"
+    podstawa, dzienna, razem = niezaleznie(["1300", "1300", "1300", "1400"], "0.25", "4806", "0.8", 66, z_minimum=True)
+    assert wynik["kwota"] == {"miesieczna": str((podstawa * Decimal("0.8")).quantize(Decimal("0.01"), ROUND_HALF_UP)),
+                              "za_okres": str(razem), "stawka": "0.80", "stawka_dzienna": str(dzienna),
+                              "podstawa_wymiaru": str(podstawa), "brutto": True}
+    assert wynik["orientacyjny"] is True
     assert wynik["okres"] == {"od": "2026-03-23", "do": "2026-05-27", "tygodnie": None, "dni": 66}
     assert wynik["okres_wynagrodzenia"]["od"] == "2026-02-18" and wynik["stawka"] == "0.80"
     assert [b["pytanie_id"] for b in wynik["brakujace_pola"]] == ["D1a"]       # pytanie o kod B
@@ -326,7 +355,7 @@ def test_jedynym_powodem_orientacyjnego_u_anny_jest_brak_kodu_b_art11():
                                        zrodlo_opis="Z-3", pewnosc=0.9)}
     f = {k: v for k, v in ANNA.items() if k != "data_urodzenia"}
     bez_kodu = _licz(f, pochodzenie=pochodzenie)
-    assert bez_kodu.orientacyjny is True and bez_kodu.brakujace == ["ezla_kod_b"]
+    assert bez_kodu.orientacyjny is True and bez_kodu.brakujace == ["ezla_kod_b"]   # podstawa wyższa od minimum
     z_kodem = _licz({**f, "ezla": _dni(date(2026, 3, 8), 81, "B")}, pochodzenie=pochodzenie)
     assert z_kodem.orientacyjny is False and z_kodem.brakujace == [] and z_kodem.stawka == "1.00"
 
@@ -335,18 +364,135 @@ def test_brak_parametrow_na_rok_daje_widoczne_ostrzezenie_w_uwagach_api():
     sid = c.post("/sprawy").json()["id"]
     s = memory.pobierz(sid)
     mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="Z-3", strony=[1], osoby=["matka"]), {
-        "ezla": [_wiersze("2025-03-08", "2025-05-27")], "wynagrodzenie_chorobowe_okres": [
-            _wiersze("2025-02-18", "2025-03-22")],
-        "pola": [{"pole": "zatrudnienie_od", "wartosc": "2024-10-01", "strona": 1, "pewnosc": 0.9},
+        "ezla": [_wiersze("2027-03-08", "2027-05-27")], "wynagrodzenie_chorobowe_okres": [
+            _wiersze("2027-02-18", "2027-03-22")],
+        "pola": [{"pole": "zatrudnienie_od", "wartosc": "2026-10-01", "strona": 1, "pewnosc": 0.9},
                  {"pole": "platnik_ponad_20", "wartosc": "do_20", "strona": 1, "pewnosc": 0.9}]})
     mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="zrzut_systemu_ZUS", strony=[2], osoby=["matka"]), {
         "pola": [{"pole": "tytuly", "wartosc": "umowa_o_prace", "tytul": "umowa_o_prace", "strona": 1, "pewnosc": 0.9}],
         "okresy_ubezpieczenia": [{"kod_tytulu": "0110", "tytul": "umowa_o_prace", "platnik": None,
-                                  "od": "2024-10-01", "do": None, "chorobowe": None, "chorobowe_dobrowolne": None,
+                                  "od": "2026-10-01", "do": None, "chorobowe": None, "chorobowe_dobrowolne": None,
                                   "strona": 1, "pewnosc": 0.9}]})
     memory.zapisz(s)
     c.post(f"/sprawy/{sid}/odpowiedzi", json=[{"pole": "sytuacja", "wartosc": ["ciaza"]}])
     wynik = next(w for w in c.get(f"/sprawy/{sid}/swiadczenia").json() if w["swiadczenie"] == "zasilek_chorobowy_ciaza")
-    assert wynik["status"] == "przysluguje" and wynik["okres"]["od"] == "2025-03-23"
-    assert wynik["uwagi"][0].startswith("Brak parametrów prawnych na rok 2025")      # nie cichy fallback
+    assert wynik["status"] == "warunkowo" and wynik["okres"]["od"] == "2027-03-23"   # zwolnienie po dzisiejszej dacie
+    assert wynik["uwagi"][0].startswith("Brak parametrów prawnych na rok 2027")      # nie cichy fallback
     assert wynik["wersja_parametrow"] == "2026-01-01"
+
+
+# ---------- podstawa wymiaru i kwota (etap 2c); dane fikcyjne, rok 2025 (płaca minimalna 4666 zł) ----------
+
+P25 = get_params(date(2025, 3, 1))
+STALE_25 = ["1000", "1000", "1000", "1100"]
+ANNA_25 = {
+    "sytuacja": ["ciaza"], "tytuly": ["umowa_o_prace"], "etat": "0.25", "zatrudnienie_od": "2024-11-01",
+    "okresy_ubezpieczenia": [{**OKRES_UOP, "od": "2024-11-01"}], "platnik_ponad_20": {"umowa_o_prace": "do_20"},
+    "data_urodzenia": "1994-05-12",
+    "miesiace": [_miesiac("2024-11", "1000.00"), _miesiac("2024-12", "1000.00"), _miesiac("2025-01", "1000.00"),
+                 _miesiac("2025-02", "1100.00")],
+    "ezla": [{"od": "2025-03-01", "do": "2025-06-06", "kod": None}],
+    "wynagrodzenie_chorobowe_okres": [{"od": "2025-03-01", "do": "2025-04-02", "kod": None}],     # 33 dni
+}
+DNI_25 = (date(2025, 6, 6) - date(2025, 4, 3)).days + 1                                            # 65 dni zasiłku
+DZIS_25 = date(2025, 12, 31)
+
+
+def test_kwota_z_minimum_art45_wynik_orientacyjny_z_wariantem_bez_minimum_art36_art45():
+    w = _licz(ANNA_25, dzis=DZIS_25, p=P25)
+    assert w.status == Status.PRZYSLUGUJE and w.okres.dni == DNI_25 == 65
+    podstawa, dzienna, razem = niezaleznie(STALE_25, "0.25", "4666", "0.8", DNI_25, z_minimum=True)
+    assert (w.kwota.podstawa_wymiaru, w.kwota.stawka, w.kwota.stawka_dzienna, w.kwota.za_okres) == \
+        (str(podstawa), "0.80", str(dzienna), str(razem))
+    assert w.orientacyjny is True and "etat" in w.pola_do_potwierdzenia and "ezla_kod_b" in w.brakujace
+    bez_p, bez_dz, bez_razem = niezaleznie(STALE_25, "0.25", "4666", "0.8", DNI_25, z_minimum=False)
+    _, _, bez_razem_b = niezaleznie(STALE_25, "0.25", "4666", "1.0", DNI_25, z_minimum=False)
+    wariant = next(u for u in w.uwagi if u.startswith("Wariant niepotwierdzony"))
+    assert kwota_tekst(bez_p) in wariant and kwota_tekst(bez_razem) in wariant and kwota_tekst(bez_razem_b) in wariant
+    assert any("art. 45" in u and "komentarzy" in u for u in w.uwagi)                              # skąd proporcja
+    _, _, z_kodem_b = niezaleznie(STALE_25, "0.25", "4666", "1.0", DNI_25, z_minimum=True)
+    assert any(u.startswith("Przy kodzie „B” zasiłek wyniósłby " + kwota_tekst(z_kodem_b)) for u in w.uwagi)
+    assert "orientacyjnie" in w.podsumowanie and kwota_tekst(razem) in w.podsumowanie
+    assert any("art. 45" in x for x in w.co_zrobic)
+
+
+def test_kwota_przy_kodzie_b_stawka_100_art11():
+    f = {**ANNA_25, "ezla": [{"od": "2025-03-01", "do": "2025-06-06", "kod": "B"}]}
+    w = _licz(f, dzis=DZIS_25, p=P25)
+    podstawa, dzienna, razem = niezaleznie(STALE_25, "0.25", "4666", "1.0", DNI_25, z_minimum=True)
+    assert (w.kwota.stawka, w.kwota.stawka_dzienna, w.kwota.za_okres) == ("1.00", str(dzienna), str(razem))
+    assert "ezla_kod_b" not in w.brakujace and not any(u.startswith("Przy kodzie") for u in w.uwagi)
+    assert w.orientacyjny is True                       # nadal: minimum przy niepełnym etacie zmienia podstawę
+
+
+def test_kwota_stawki_mieszane_kod_b_tylko_w_czesci_art11():
+    ezla = [{"od": "2025-03-01", "do": "2025-04-30", "kod": "B"}, {"od": "2025-05-01", "do": "2025-06-06", "kod": "A"}]
+    w = _licz({**ANNA_25, "ezla": ezla}, dzis=DZIS_25, p=P25)
+    d_b = (date(2025, 4, 30) - date(2025, 4, 3)).days + 1                       # dni zasiłku z kodem B
+    d_a = DNI_25 - d_b
+    _, dz_b, _ = niezaleznie(STALE_25, "0.25", "4666", "1.0", 1, z_minimum=True)
+    _, dz_a, _ = niezaleznie(STALE_25, "0.25", "4666", "0.8", 1, z_minimum=True)
+    assert w.kwota.stawka is None and w.kwota.stawka_dzienna is None
+    assert Decimal(w.kwota.za_okres) == dz_b * d_b + dz_a * d_a
+
+
+def test_art45_parametr_brak_nie_podnosi_podstawy_i_pokazuje_wariant_proporcjonalny_art45():
+    p = {**P25, "art45_niepelny_etat": "brak"}
+    w = _licz(ANNA_25, dzis=DZIS_25, p=p)
+    podstawa, _, razem = niezaleznie(STALE_25, "0.25", "4666", "0.8", DNI_25, z_minimum=False)
+    assert w.kwota.podstawa_wymiaru == str(podstawa) and w.kwota.za_okres == str(razem)
+    assert w.orientacyjny is True
+    assert any("Nie podnosiliśmy podstawy" in u for u in w.uwagi)
+    assert any(u.startswith("Wariant niepotwierdzony (z najniższą podstawą proporcjonalną do etatu)") for u in w.uwagi)
+
+
+def test_pelny_etat_minimum_jest_pewne_nie_robi_wyniku_orientacyjnego_art45():
+    f = {**ANNA_25, "etat": "1.00", "ezla_kod_b": False}
+    w = _licz(f, dzis=DZIS_25, p=P25)
+    podstawa, _, _ = niezaleznie(STALE_25, "1", "4666", "0.8", DNI_25, z_minimum=True)
+    assert w.kwota.podstawa_wymiaru == str(podstawa) == "4026.29"                  # 4666 − 13,71%
+    assert w.orientacyjny is False                      # pełny etat: minimum pewne; kod podany (D1a = nie)
+    assert not any("Wariant niepotwierdzony" in u for u in w.uwagi)
+
+
+def test_brak_miesiecy_brak_kwoty_ale_status_i_okres_bez_zmian_art36():
+    f = {k: v for k, v in ANNA_25.items() if k != "miesiace"}
+    w = _licz(f, dzis=DZIS_25, p=P25)
+    assert w.status == Status.PRZYSLUGUJE and w.okres.dni == 65 and w.kwota is None
+    assert "srednie_wynagrodzenie_brutto" in w.brakujace
+
+
+def test_dzialalnosc_12_miesiecy_i_prog_60_proc_prosta_srednia_art48():
+    f = _dzialalnosc_facts()
+    w = _licz(f, p=P)
+    podstawa, dzienna, razem = niezaleznie(["4000"] * 12, "1", "4806", "0.8", w.okres.dni, z_minimum=False)
+    assert w.kto_wyplaca == "zus" and w.kwota.podstawa_wymiaru == str(podstawa) == "3451.60"
+    assert w.kwota.za_okres == str(razem) and w.kwota.stawka_dzienna == str(dzienna)
+
+
+def test_dzialalnosc_prog_60_proc_niespelniony_bez_kwoty_art48a():
+    w = _licz({**_dzialalnosc_facts(), "podstawa_60_proc": False}, p=P)
+    assert w.status == Status.PRZYSLUGUJE and w.kwota is None and w.okres is not None
+    assert any("art. 48a" in u and "Kwoty nie liczymy" in u for u in w.uwagi)
+
+
+def test_dzialalnosc_ubezpieczenie_krotsze_niz_12_miesiecy_bez_kwoty_art48a():
+    f = {**_dzialalnosc_facts(), "chorobowe_od": "2025-09-01",
+         "okresy_ubezpieczenia": [{**OKRES_UOP, "tytul": "dzialalnosc", "od": "2025-09-01"}]}
+    w = _licz(f, p=P)
+    assert w.kwota is None and any("art. 48a" in u for u in w.uwagi) and w.brakujace == ["ezla_kod_b"]
+
+
+def test_dzialalnosc_nieznany_prog_60_proc_pytamy_nie_liczymy_art48a():
+    f = {k: v for k, v in _dzialalnosc_facts().items() if k != "podstawa_60_proc"}
+    w = _licz(f, p=P)
+    assert w.kwota is None and "podstawa_60_proc" in w.brakujace
+
+
+def _dzialalnosc_facts():
+    miesiace = [{"miesiac": f"{r}-{m:02d}", "podstawa": "4000.00", "wakacje_skladkowe": False}
+                for r, m in [(2025, i) for i in range(3, 13)] + [(2026, 1), (2026, 2)]]
+    return {"sytuacja": ["ciaza"], "tytuly": ["dzialalnosc"], "chorobowe": {"dzialalnosc": True},
+            "chorobowe_od": "2024-06-01", "okresy_ubezpieczenia": [{**OKRES_UOP, "tytul": "dzialalnosc", "od": "2024-06-01"}],
+            "ezla": [{"od": "2026-03-08", "do": "2026-04-26", "kod": None}], "podstawa_deklarowana": miesiace,
+            "podstawa_60_proc": True}

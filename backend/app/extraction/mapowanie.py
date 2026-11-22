@@ -82,6 +82,14 @@ def _okres_ubezpieczenia(o: dict[str, Any]) -> dict[str, Any] | None:
             "chorobowe_dobrowolne": bool(o.get("chorobowe_dobrowolne"))}
 
 
+def _podstawa_miesiac(o: dict[str, Any]) -> dict[str, Any] | None:
+    """Wiersz tabeli podstaw składki (Q1): {miesiac, podstawa (tekst, 2 miejsca), wakacje_skladkowe}."""
+    if not o.get("miesiac") or o.get("podstawa") is None:
+        return None
+    return {"miesiac": o["miesiac"], "podstawa": _kwota(o["podstawa"]),
+            "wakacje_skladkowe": bool(o.get("wakacje_skladkowe"))}
+
+
 def _ezla(o: dict[str, Any]) -> dict[str, Any] | None:
     od, do = _data(o.get("od")), _data(o.get("do"))
     if od is None or do is None:
@@ -94,7 +102,7 @@ def _okresy_wpisu(w: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 _LISTY = {"miesiace": miesiac_pola, "okresy_ubezpieczenia": _okres_ubezpieczenia, "ezla": _ezla,
-          "wynagrodzenie_chorobowe_okres": _ezla}
+          "wynagrodzenie_chorobowe_okres": _ezla, "podstawa_deklarowana": _podstawa_miesiac}
 
 
 def _tak_nie(v: Any) -> bool | None:
