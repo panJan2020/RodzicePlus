@@ -2,7 +2,7 @@ import '../../core/session.dart';
 import '../api_client.dart';
 import '../models/modele.dart';
 
-/// Symulowane logowanie przez mObywatela (FR-01).
+/// Symulowane logowanie przez mObywatela (docs/opis_aplikacji.md, rozdz. 9).
 class AuthRepository {
   AuthRepository(this._api, this._sesja);
 
@@ -16,7 +16,7 @@ class AuthRepository {
 
   /// Loguje i zapisuje sesję – router sam przeniesie użytkownika dalej.
   Future<Sesja> zaloguj(String login) async {
-    final sesja = Sesja.fromJson(await _api.post('/auth/mobywatel', {'uzytkownik': login}) as Map<String, dynamic>);
+    final sesja = Sesja.fromJson(await _api.post('/auth/mobywatel', {'login': login}) as Map<String, dynamic>);
     _sesja.ustaw(sesja);
     return sesja;
   }

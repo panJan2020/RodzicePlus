@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/models/modele.dart';
 
-/// Stan zalogowania (symulacja mObywatela, FR-01) i bieżąca sprawa. Jeden obiekt na całą aplikację.
+/// Stan zalogowania (symulacja mObywatela) i bieżąca sprawa. Jeden obiekt na całą aplikację.
 /// Router nasłuchuje zmian i przekierowuje po zalogowaniu / wylogowaniu.
 ///
 /// Sesja jest trzymana w pamięci – odświeżenie strony wylogowuje.

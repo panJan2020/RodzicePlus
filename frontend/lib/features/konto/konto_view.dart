@@ -7,7 +7,7 @@ import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import 'konto_viewmodel.dart';
 
-/// „Moje konto” – kim jestem po symulowanym logowaniu (FR-01).
+/// „Moje konto” – kim jestem po symulowanym logowaniu.
 class KontoView extends StatelessWidget {
   const KontoView({super.key});
 

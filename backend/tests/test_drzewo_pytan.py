@@ -138,6 +138,14 @@ def test_pole_na_tytul_ma_klucze_z_tytulow():
     assert [k.wartosc for k in st["B4"].klucze] == ["zlecenie"]
 
 
+def test_klucze_obejmuja_tytuly_z_aktywnej_wartosci():
+    s, o = _sprawa(tytuly=["umowa_o_prace", "zlecenie"])
+    merge.dodaj(s, o, "chorobowe", WartoscPola(wartosc={"umowa_o_prace": True, "zlecenie": False},
+                                               wystawca=Wystawca.ZUS, kanal=Kanal.ZUS_KONTO,
+                                               zrodlo_opis="Konto w ZUS"), prog=0.6)
+    assert [k.etykieta for k in _stany(s)["B4"].klucze] == ["Umowa o pracę", "Umowa zlecenia lub agencyjna"]
+
+
 # ---------- API: sprawa i osoby ----------
 
 def test_nowa_sprawa_anonimowa_z_dzieckiem():

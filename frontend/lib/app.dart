@@ -10,7 +10,6 @@ import 'core/theme.dart';
 import 'data/api_client.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/sprawa_repository.dart';
-import 'data/repositories/zus_repository.dart';
 
 /// Korzeń aplikacji: tworzy sesję, klienta API, repozytoria i router (raz, na całe życie aplikacji)
 /// i udostępnia je widokom przez `provider`.
@@ -28,7 +27,6 @@ class _AppState extends State<App> {
   late final SesjaAplikacji _sesja = SesjaAplikacji();
   late final ApiClient _api = widget.api?.call(_sesja) ?? ApiClient(_sesja);
   late final AuthRepository _auth = AuthRepository(_api, _sesja);
-  late final ZusRepository _zus = ZusRepository(_api);
   late final SprawaRepository _sprawy = SprawaRepository(_api, _sesja);
   late final GoRouter _router = utworzRouter(_sesja);
 
@@ -46,7 +44,6 @@ class _AppState extends State<App> {
         ChangeNotifierProvider<SesjaAplikacji>.value(value: _sesja),
         Provider<ApiClient>.value(value: _api),
         Provider<AuthRepository>.value(value: _auth),
-        Provider<ZusRepository>.value(value: _zus),
         Provider<SprawaRepository>.value(value: _sprawy),
       ],
       child: MaterialApp.router(

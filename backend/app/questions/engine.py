@@ -55,6 +55,7 @@ class Pytanie(BaseModel):
     gdzie_znalezc: str | None = None
     rodzaj: str
     edytowalne: bool                  # czy użytkownik może odpowiedzieć (kreator w źródłach, nie „tylko podgląd”)
+    na_tytul: bool = False            # wartość to słownik {tytul: odpowiedź}
     klucze: list[Opcja] = Field(default_factory=list)  # pola „na tytuł”: tytuły, dla których podajemy odpowiedź
     status: StatusPytania
     czeka_na: list[str] = Field(default_factory=list)  # ID pytań, na które trzeba najpierw odpowiedzieć
@@ -199,15 +200,17 @@ class _Stany:
 
 
 def _klucze_tytulow(q: dict[str, Any], osoba: Osoba) -> list[Opcja]:
-    """Pole „na tytuł”: aktywne tytuły osoby, które spełniają warunek pytania (np. tylko zlecenie i działalność)."""
+    """Pole „na tytuł”: aktywne tytuły osoby, które spełniają warunek pytania (np. tylko zlecenie i działalność),
+    oraz tytuły, które już są w aktywnej wartości (np. z ZUS) – żeby każdy wiersz miał czytelną etykietę."""
     tytuly = osoba.wartosc("tytuly") or []
+    juz_w_wartosci = osoba.wartosc(q["pole"]) or {}
     dozwolone = None
     for w in q.get("pokaz_gdy", []):
         if w["pole"] == "tytuly":
             dozwolone = w.get("zawiera_ktores") or [w.get("zawiera")]
     etykiety = {o["wartosc"]: o["etykieta"] for o in pytanie_dla_pola("tytuly")["opcje"]}
     return [Opcja(wartosc=t, etykieta=etykiety.get(t, t)) for t in tytuly
-            if (dozwolone is None or t in dozwolone) and t in etykiety]
+            if (dozwolone is None or t in dozwolone or t in juz_w_wartosci) and t in etykiety]
 
 
 def drzewo(sprawa: Sprawa, osoba: Osoba) -> list[Pytanie]:
@@ -224,7 +227,7 @@ def drzewo(sprawa: Sprawa, osoba: Osoba) -> list[Pytanie]:
             id=q["id"], sekcja=q["sekcja"], pole=q["pole"], tresc=q["tresc"], typ=q["typ"],
             opcje=[Opcja(**o) for o in q.get("opcje", [])], pomoc=q.get("pomoc"),
             gdzie_znalezc=q.get("gdzie_znalezc"), rodzaj=q["rodzaj"], edytowalne=edytowalne(q),
-            klucze=_klucze_tytulow(q, osoba) if q.get("na_tytul") else [],
+            na_tytul=bool(q.get("na_tytul")), klucze=_klucze_tytulow(q, osoba) if q.get("na_tytul") else [],
             status=status, czeka_na=czeka_na,
             wartosci=[WartoscPolaApi(**w.model_dump(), do_sprawdzenia=w.kanal == Kanal.UPLOAD and w.pewnosc < prog)
                       for w in wartosci],

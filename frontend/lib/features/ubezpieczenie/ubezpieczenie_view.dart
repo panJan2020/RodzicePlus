@@ -9,14 +9,14 @@ import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import 'ubezpieczenie_viewmodel.dart';
 
-/// „Moje ubezpieczenie” – symulowane pobranie z ZUS danych o ubezpieczeniu albo o jego braku (FR-02).
+/// „Moje ubezpieczenie” – stan ubezpieczenia z danych sprawy (symulowane konto w ZUS, docs/opis_aplikacji.md, rozdz. 9).
 class UbezpieczenieView extends StatelessWidget {
   const UbezpieczenieView({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (c) => UbezpieczenieViewModel(c.read(), c.read()),
+      create: (c) => UbezpieczenieViewModel(c.read()),
       child: const _Tresc(),
     );
   }
@@ -155,7 +155,7 @@ class _ZapiszWSprawie extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<UbezpieczenieViewModel>();
     final t = Theme.of(context).textTheme;
-    final wynik = vm.wynikZapisu;
+    final pobrano = vm.pobrano;
 
     return Card(
       child: Padding(
@@ -163,43 +163,35 @@ class _ZapiszWSprawie extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Użyj tych danych w kalkulatorze', style: t.titleMedium),
-            const SizedBox(height: 4),
-            Text('Zapiszemy je w Twojej sprawie, żeby nie pytać Cię o nie drugi raz.', style: t.bodyMedium),
-            const SizedBox(height: 16),
-            if (wynik == null)
-              FilledButton.icon(
-                onPressed: vm.zapisuje ? null : vm.zapiszWSprawie,
-                icon: vm.zapisuje
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.download),
-                label: const Text('Zapisz w mojej sprawie'),
-              )
-            else
-              Semantics(
-                liveRegion: true,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.check_circle, color: Kolory.primary, semanticLabel: 'Zapisano'),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Zapisano dane z ZUS w Twojej sprawie.'
-                        '${wynik.pominieto.isEmpty ? '' : ' Część informacji podano już wcześniej '
-                            'w kreatorze – zostawiliśmy Twoje odpowiedzi.'}',
-                        style: t.bodyLarge,
-                      ),
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.check_circle, color: Kolory.primary, semanticLabel: 'Zapisano'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dane z ZUS są zapisane w Twojej sprawie – nie zapytamy Cię o nie drugi raz.'
+                      '${pobrano != null && pobrano.noweKonflikty > 0 ? ' Część z nich różni się od Twoich '
+                          'wcześniejszych odpowiedzi – obie wersje znajdziesz w „Moich danych”.' : ''}',
+                      style: t.bodyLarge,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            if (vm.bladZapisu != null) ...[
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: vm.pobiera ? null : vm.pobierzPonownie,
+              icon: vm.pobiera
+                  ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh),
+              label: const Text('Pobierz ponownie z ZUS'),
+            ),
+            if (vm.bladPobrania != null) ...[
               const SizedBox(height: 12),
-              Text(vm.bladZapisu!, style: const TextStyle(color: Kolory.blad, fontSize: 16)),
+              Text(vm.bladPobrania!, style: const TextStyle(color: Kolory.blad, fontSize: 16)),
             ],
           ],
         ),

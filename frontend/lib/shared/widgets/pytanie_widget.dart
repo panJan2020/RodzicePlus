@@ -7,8 +7,9 @@ import '../formatowanie.dart';
 /// Pole odpowiedzi na jedno pytanie z katalogu. Wspólne dla zakładki „Dane” i kreatora.
 ///
 /// Widżet tylko zbiera odpowiedź i oddaje ją przez [onZmiana] w formacie API:
-/// wybor → String, wielokrotny → List, tak_nie → bool, liczba/kwota → num, data → `RRRR-MM-DD`.
-/// `null` = brak odpowiedzi. Niczego nie sprawdza prawnie – to robi backend.
+/// wybor → String, wielokrotny → List, tak_nie → bool, liczba/kwota → num, data → `RRRR-MM-DD`,
+/// pole „na tytuł” → `{tytuł: odpowiedź}`. `null` = brak odpowiedzi. Niczego nie sprawdza – to robi backend
+/// (on też zamienia kwoty i ułamki na tekst).
 class PytanieWidget extends StatefulWidget {
   const PytanieWidget({super.key, required this.pytanie, required this.wartosc, required this.onZmiana});
 
@@ -24,6 +25,7 @@ class _PytanieWidgetState extends State<PytanieWidget> {
   late final TextEditingController _tekst = TextEditingController(
     text: switch (widget.wartosc) {
       final num n => formatujLiczbe(n),
+      final String s when num.tryParse(s) != null => formatujLiczbe(s),
       _ => '',
     },
   );
@@ -37,6 +39,7 @@ class _PytanieWidgetState extends State<PytanieWidget> {
   @override
   Widget build(BuildContext context) {
     final p = widget.pytanie;
+    if (p.naTytul) return _naTytul(p);
     return switch (p.typ) {
       TypPytania.wybor => _karty(
           [for (final o in p.opcje) (o.etykieta, widget.wartosc == o.wartosc, () => widget.onZmiana(o.wartosc))],
@@ -53,6 +56,39 @@ class _PytanieWidgetState extends State<PytanieWidget> {
       TypPytania.data => _data(context),
       TypPytania.okresy => Text(opisWartosci(p), style: Theme.of(context).textTheme.bodyLarge),
     };
+  }
+
+  /// Pole „na tytuł” (np. C1): osobna odpowiedź dla każdej umowy.
+  Widget _naTytul(PytanieDrzewa p) {
+    final t = Theme.of(context).textTheme;
+    if (p.klucze.isEmpty) {
+      return Text('Najpierw zaznacz, na jakiej podstawie pracujesz (pytanie B1).', style: t.bodyLarge);
+    }
+    final mapa = widget.wartosc is Map ? Map<String, Object?>.from(widget.wartosc as Map) : <String, Object?>{};
+    void ustaw(Object? klucz, Object? v) {
+      final nowa = {...mapa, '$klucz': v};
+      widget.onZmiana(nowa.values.every((x) => x != null) && nowa.length == p.klucze.length ? nowa : null);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final k in p.klucze) ...[
+          Text(k.etykieta, style: t.titleMedium),
+          const SizedBox(height: 8),
+          if (p.typ == TypPytania.takNie)
+            _karty([
+              ('Tak', mapa['${k.wartosc}'] == true, () => ustaw(k.wartosc, true)),
+              ('Nie', mapa['${k.wartosc}'] == false, () => ustaw(k.wartosc, false)),
+            ], wielokrotny: false)
+          else
+            _karty([
+              for (final o in p.opcje) (o.etykieta, mapa['${k.wartosc}'] == o.wartosc, () => ustaw(k.wartosc, o.wartosc)),
+            ], wielokrotny: false),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
   }
 
   List<Object?> get _wybrane => widget.wartosc is List ? List<Object?>.from(widget.wartosc as List) : [];
@@ -192,7 +228,7 @@ Future<EdycjaOdpowiedzi?> pokazEdycjePytania(BuildContext context, PytanieDrzewa
           ),
         ),
         actions: [
-          if (p.odpowiedziane)
+          if (p.maOdpowiedzUzytkownika)
             TextButton(
               onPressed: () => Navigator.pop(context, const EdycjaOdpowiedzi(null)),
               child: const Text('Wyczyść'),

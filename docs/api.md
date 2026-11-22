@@ -200,6 +200,7 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "pomoc": "…", "gdzie_znalezc": "zaświadczenie lekarskie o przewidywanej dacie porodu",
  "rodzaj": "fakt",                // fakt | plan (plany tylko od użytkownika) | wyliczone
  "edytowalne": true,              // false: tylko podgląd (np. e-ZLA, okresy ubezpieczenia) albo brak kreatora w źródłach
+ "na_tytul": false,               // true: wartość to słownik {tytul: odpowiedź}
  "klucze": [],                    // pola „na tytuł” (B4, C1): [{"wartosc": "umowa_o_prace", "etykieta": "Umowa o pracę"}] –
                                   // wartość pola to słownik {"umowa_o_prace": "ponad_20", ...}
  "status": "aktywne",             // aktywne | zablokowane (czeka_na) | wykluczone (wartość zostaje, reguły jej nie używają)

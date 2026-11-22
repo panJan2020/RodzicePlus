@@ -7,7 +7,7 @@ class Stopka extends StatelessWidget {
   const Stopka({super.key});
 
   // Adresy pokazujemy jako tekst do zaznaczenia. Klikalne linki wymagają pakietu
-  // url_launcher – do decyzji zespołu (FR-27).
+  // url_launcher – do decyzji zespołu (docs/opis_aplikacji.md, rozdz. 8).
   static const _linki = [
     ('ZUS', 'www.zus.pl'),
     ('Urlop rodzicielski', 'www.gov.pl/web/rodzina'),

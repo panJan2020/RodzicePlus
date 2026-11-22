@@ -4,7 +4,7 @@ import '../../data/api_client.dart';
 import '../../data/models/modele.dart';
 import '../../data/repositories/sprawa_repository.dart';
 
-/// Ekran „Kalkulator”: uprawnienia (przysługuje / nie / brak danych) i wyliczone okresy z kwotami.
+/// Ekran „Kalkulator”: świadczenia (przysługuje / nie / brak danych) i wyliczone okresy z kwotami.
 class KalkulatorViewModel extends ChangeNotifier {
   KalkulatorViewModel(this._sprawy) {
     zaladuj();
@@ -12,7 +12,7 @@ class KalkulatorViewModel extends ChangeNotifier {
 
   final SprawaRepository _sprawy;
 
-  List<WynikUprawnienia> uprawnienia = [];
+  List<WynikSwiadczenia> swiadczenia = [];
   WynikKalkulatora? wynik;
   bool laduje = false;
   String? blad;
@@ -25,7 +25,7 @@ class KalkulatorViewModel extends ChangeNotifier {
     blad = null;
     notifyListeners();
     try {
-      uprawnienia = await _sprawy.uprawnienia();
+      swiadczenia = await _sprawy.swiadczenia();
       try {
         wynik = await _sprawy.kalkulator();
         bladKalkulatora = null;

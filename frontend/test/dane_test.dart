@@ -1,4 +1,4 @@
-// FR-03 – zakładka „Moje dane”: drzewo pytań, źródła wartości, edycja, głęboki link z kalkulatora.
+// Zakładka „Moje dane”: drzewo pytań, aktywna wartość i jej źródło, edycja, osoby w sprawie, głęboki link.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,7 +22,7 @@ void main() {
     // Sekcja B: niepewny odczyt z dokumentu z ostrzeżeniem.
     await tester.tap(find.text('Ubezpieczenie').last);
     await tester.pumpAndSettle();
-    expect(find.text('Z dokumentu Z-3, str. 2'), findsOneWidget);
+    expect(find.text('Z-3, str. 2'), findsOneWidget);
     expect(find.textContaining('odczyt z dokumentu jest niepewny'), findsOneWidget);
     expect(find.text('Sprawdź i popraw'), findsOneWidget);
 
@@ -72,5 +72,17 @@ void main() {
     expect(find.text('Na jakiej podstawie pracujesz?'), findsOneWidget);
     expect(find.text('Jaka jest Twoja sytuacja?'), findsNothing);
     expect(tester.getTopLeft(find.text('Na jakiej podstawie pracujesz?')).dy, lessThan(812));
+  });
+
+  testWidgets('przełączenie na dziecko pokazuje jego pytania', (tester) async {
+    await uruchomAplikacje(tester, const Size(1440, 1000));
+    await _otworzDane(tester);
+
+    expect(find.text('Ty'), findsOneWidget);
+    await tester.tap(find.text('Dziecko'));
+    await tester.pumpAndSettle();
+    expect(find.text('Czy dziecko ma zaświadczenie „Za życiem”?'), findsOneWidget);
+    expect(find.text('Jaka jest Twoja sytuacja?'), findsNothing);
+    expect(find.text('Uzupełnij danymi z ZUS'), findsNothing);
   });
 }
