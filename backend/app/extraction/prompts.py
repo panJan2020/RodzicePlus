@@ -48,7 +48,9 @@ Tytuł ubezpieczenia (okresy_ubezpieczenia, tytuly, chorobowe):
 ZRZUT = """
 Zrzut z systemu ZUS to tabela(e) okresów ubezpieczenia, często obrócona o 90°. Przepisz każdy wiersz okresu
 (od, do, kod tytułu, płatnik) do „okresy_ubezpieczenia”; „chorobowe_od” to początek nieprzerwanego ubezpieczenia
-chorobowego, jeśli da się go ustalić z wierszy; „tytuly” – tytuły trwających okresów."""
+chorobowego, jeśli da się go ustalić z wierszy; „tytuly” – tytuły trwających okresów.
+Jeśli zrzut przedstawia zwolnienia lekarskie (e-ZLA) – okresy niezdolności od–do wpisz do „ezla”, a literę kodu
+niezdolności tylko wtedy, gdy jest widoczna na obrazie (inaczej null, nie wnioskuj jej)."""
 
 
 def odczyt(typ: str) -> str:
@@ -69,6 +71,9 @@ Odczytaj z niego pola ze schematu. Zasady:
 - „osoba” (jeśli jest w schemacie) – czyja to wartość (matka, ojciec, dziecko), jeśli to widać; inaczej „nieznana”.
 - Zwolnienia lekarskie (ezla): pole „kod” wypełnij TYLKO, jeśli litera kodu (np. „B”) jest widoczna
   na dokumencie; inaczej null. Nie wnioskuj kodu z innych informacji.
+- wynagrodzenie_chorobowe_okres (Z-3, „Informacje o wypłaconych świadczeniach” pkt 1, art. 92 Kodeksu pracy):
+  tylko gdy zaznaczono TAK – każdy wpisany okres od–do jako osobny wiersz; „kod” tylko jeśli wpisany. Gdy zaznaczono
+  NIE albo pole jest puste – nie dodawaj wierszy. Okresy wynagrodzenia i zasiłku (pkt 2) to różne pola.
 - Pola na tytuł (chorobowe, platnik_ponad_20): jeśli schemat ma „tytul”, podaj tytuł ubezpieczenia, jeśli jest
   widoczny; inaczej „nieznany”.
 - platnik_ponad_20: „ponad_20”, gdy dokument wskazuje, że płatnik zgłasza do ubezpieczenia chorobowego

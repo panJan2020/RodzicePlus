@@ -87,3 +87,39 @@ def test_moje_dane_pokazuja_b7_wyliczone_art29():
     # nie da się na nie odpowiedzieć ręcznie
     r = c.post(f"/sprawy/{sid}/odpowiedzi", json=[{"pole": "ubezpieczony_w_dniu_zdarzenia", "wartosc": True}])
     assert r.status_code == 400
+
+
+# ---------- chorobowe: null (np. zrzut systemu ZUS) nie znaczy „brak ubezpieczenia” ----------
+
+def _okres(tytul, chorobowe, od="2025-10-01"):
+    return {"tytul": tytul, "platnik": "", "od": od, "do": None, "chorobowe": chorobowe}
+
+
+def test_umowa_o_prace_z_chorobowe_null_ma_ubezpieczenie_obowiazkowe_art29():
+    u = wyliczone.ubezpieczony_w_dniu({"okresy_ubezpieczenia": [_okres("umowa_o_prace", None)]}, date(2026, 7, 10), P)
+    assert u.wartosc is True and u.brakujace == []
+
+
+def test_umowa_o_prace_z_chorobowe_false_nadal_bez_ubezpieczenia_art29():
+    u = wyliczone.ubezpieczony_w_dniu({"okresy_ubezpieczenia": [_okres("umowa_o_prace", False)]}, date(2026, 7, 10), P)
+    assert u.wartosc is False
+
+
+def test_zlecenie_i_dzialalnosc_z_chorobowe_null_to_brak_danych_art29():
+    for tytul in ("zlecenie", "dzialalnosc"):
+        u = wyliczone.ubezpieczony_w_dniu({"okresy_ubezpieczenia": [_okres(tytul, None)]}, date(2026, 7, 10), P)
+        assert u.wartosc is None and u.brakujace == ["chorobowe_dobrowolne"], tytul
+
+
+def test_zlecenie_z_chorobowe_null_i_odpowiedzia_uzytkownika_art29():
+    f = {"okresy_ubezpieczenia": [_okres("zlecenie", None)], "chorobowe": {"zlecenie": True}}
+    assert wyliczone.ubezpieczony_w_dniu(f, date(2026, 7, 10), P).wartosc is True
+    f = {"okresy_ubezpieczenia": [_okres("zlecenie", None)], "chorobowe_dobrowolne": False}
+    assert wyliczone.ubezpieczony_w_dniu(f, date(2026, 7, 10), P).wartosc is False
+
+
+def test_nieznane_chorobowe_zakonczonego_okresu_nie_blokuje_art29():
+    f = {"okresy_ubezpieczenia": [{**_okres("zlecenie", None, "2020-01-01"), "do": "2021-12-31"},
+                                  _okres("umowa_o_prace", None)]}
+    u = wyliczone.ubezpieczony_w_dniu(f, date(2026, 7, 10), P)
+    assert u.wartosc is True and u.brakujace == []

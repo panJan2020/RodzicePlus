@@ -210,7 +210,8 @@ class _OkresIKwota extends StatelessWidget {
     final o = wynik.okres;
     final k = wynik.kwota;
     final wiersze = <(String, String)>[
-      if (o != null) ('Okres', '${formatujDate(o.odDnia)} – ${formatujDate(o.doDnia)} (${o.tygodnie} tyg.)'),
+      if (o != null)
+        ('Okres', '${formatujDate(o.odDnia)} – ${formatujDate(o.doDnia)}${o.dlugoscTekst == null ? '' : ' (${o.dlugoscTekst})'}'),
       if (k != null) ...[
         ('Miesięcznie', '${formatujKwote(k.miesieczna)} brutto'),
         ('Za cały okres', '${formatujKwote(k.zaOkres)} brutto'),

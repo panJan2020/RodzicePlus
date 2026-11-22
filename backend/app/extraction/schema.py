@@ -15,7 +15,7 @@ from typing import Any
 from app.domain.model import Wystawca
 from app.questions.engine import pola_z_dokumentow
 
-WERSJA = "2a-7"            # odczyt pól
+WERSJA = "2a-8"            # odczyt pól
 WERSJA_KLASYFIKACJI = "k2"  # klasyfikacja stron  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
 
 
@@ -138,6 +138,10 @@ _TABELE: dict[str, dict[str, Any]] = {
     # D1 – zwolnienia lekarskie; `kod` tylko, gdy widoczny na dokumencie.
     "ezla": _wiersz({"od": _DATA, "do": _DATA,
                      "kod": _null({"type": "string", "description": "litera kodu niezdolności, tylko jeśli widoczna"})}),
+    # D3a – Z-3, „Informacje o wypłaconych świadczeniach” pkt 1: okresy wynagrodzenia chorobowego (art. 92 KP)
+    "wynagrodzenie_chorobowe_okres": _wiersz({
+        "od": _DATA, "do": _DATA,
+        "kod": _null({"type": "string", "description": "kod literowy przy okresie, tylko jeśli wpisany"})}),
     # B5a – okresy ubezpieczenia (zrzut systemu / poświadczenie ZUS)
     "okresy_ubezpieczenia": _wiersz({
         "kod_tytulu": _null({"type": "string", "description": "4-cyfrowy kod tytułu ubezpieczenia, np. 0110"}),

@@ -10,16 +10,47 @@ Wynik tylko na konsolę. Nie wklejaj go do repo (dane z zestawów ZUS).
 """
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
-from app.domain.model import Rola, Sprawa
+from app import merge
+from app.calculator.okresy_chorobowe import poczatek_niezdolnosci
+from app.domain.model import Kanal, Rola, Sprawa, WartoscPola, Wystawca
 from app.extraction import pipeline
 from app.merge.scalanie import prog_pewnosci
+from app.params.store import get_params
+from app.questions import engine
+from app.rules.wspolne import Kontekst
+from app.rules.zasilek_chorobowy_ciaza import zasilek_chorobowy_ciaza
 
 
 def _krotko(v, n=90) -> str:
     t = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
     return t if len(t) <= n else t[: n - 1] + "…"
+
+
+def _wynik_reguly(s: Sprawa) -> None:
+    """Zasiłek chorobowy w ciąży na odczytanych danych (zakładamy, że to sprawa ciążowa – odpowiedź A1)."""
+    matka = s.osoby[0]
+    merge.dodaj(s, matka, "sytuacja", WartoscPola(wartosc=["ciaza"], wystawca=Wystawca.UZYTKOWNIK,
+                                                   kanal=Kanal.KREATOR, zrodlo_opis="skrypt"), rodzaj="fakt")
+    f, pochodzenie = engine.fakty_z_pochodzeniem(s, matka)
+    p = get_params(poczatek_niezdolnosci(f))
+    w = zasilek_chorobowy_ciaza(Kontekst(fakty=f, pochodzenie=pochodzenie, dzis=date.today(),
+                                         prog_pewnosci=prog_pewnosci()), p)[0]
+    print("\n## Zasiłek chorobowy w ciąży (reguła 2b)")
+    print(f"- status: {w.status.value}{' (orientacyjny)' if w.orientacyjny else ''}")
+    print(f"- {w.podsumowanie}")
+    if w.okres:
+        print(f"- zasiłek: {w.okres.od:%d.%m.%Y}–{w.okres.do:%d.%m.%Y}, {w.okres.dni} dni, stawka {w.stawka}, "
+              f"kto wypłaca: {w.kto_wyplaca}")
+    if w.okres_wynagrodzenia:
+        o = w.okres_wynagrodzenia
+        print(f"- wynagrodzenie pracodawcy: {o.od:%d.%m.%Y}–{o.do:%d.%m.%Y}, {o.dni} dni")
+    for nazwa in ("brakujace", "pola_do_potwierdzenia", "uwagi", "co_zrobic"):
+        wartosci = getattr(w, nazwa)
+        if wartosci:
+            print(f"- {nazwa}: {wartosci}")
 
 
 def main(sciezka: str) -> None:
@@ -62,6 +93,8 @@ def main(sciezka: str) -> None:
 
     print("\n## Decyzja ZUS (oczekiwany_wynik – tylko do porównania)")
     print(s.oczekiwany_wynik or "(nie rozpoznano)")
+
+    _wynik_reguly(s)
 
     print("\n## Wywołania Claude")
     for w in wynik.wywolania:

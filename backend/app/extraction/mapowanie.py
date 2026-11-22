@@ -93,7 +93,8 @@ def _okresy_wpisu(w: dict[str, Any]) -> list[dict[str, Any]]:
     return [e for e in (_okres_ubezpieczenia(x) for x in w.get("wartosc") or []) if e is not None]
 
 
-_LISTY = {"miesiace": miesiac_pola, "okresy_ubezpieczenia": _okres_ubezpieczenia, "ezla": _ezla}
+_LISTY = {"miesiace": miesiac_pola, "okresy_ubezpieczenia": _okres_ubezpieczenia, "ezla": _ezla,
+          "wynagrodzenie_chorobowe_okres": _ezla}
 
 
 def _tak_nie(v: Any) -> bool | None:

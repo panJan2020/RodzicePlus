@@ -35,6 +35,8 @@ class WynikReguly(BaseModel):
     podsumowanie: str = ""
     okres: OkresWyniku | None = None
     kwota: KwotaWyniku | None = None
+    stawka: str | None = None
+    okres_wynagrodzenia: OkresWyniku | None = None
     kto_wyplaca: str | None = None
     kto_wyplaca_opis: str | None = None
     gdzie_zlozyc: str | None = None
@@ -97,6 +99,10 @@ def kwota_tekst(k: Decimal | str) -> str:
         grupy.insert(0, calosc[-3:])
         calosc = calosc[:-3]
     return f"{znak}{' '.join(grupy)},{grosze} zł"
+
+
+def dni_tekst(n: int) -> str:
+    return "1 dzień" if n == 1 else f"{n} dni"
 
 
 def tygodnie_tekst(n: int) -> str:

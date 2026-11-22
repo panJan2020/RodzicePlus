@@ -14,7 +14,7 @@ import json
 from typing import Any
 
 from app.domain.model import Kanal, Osoba, Sprawa, WartoscPola
-from app.merge import hierarchia
+from app.merge import hierarchia, okresy
 from app.params.store import get_params
 
 
@@ -55,6 +55,8 @@ def dodaj(sprawa: Sprawa, osoba: Osoba, pole: str, nowa: WartoscPola, rodzaj: st
         nowa.id = sprawa.nowe_id("w")
         wartosci.append(nowa)
         zapisana = nowa
+    if pole in okresy.POLA_SCALANE:
+        okresy.scal(sprawa, osoba, pole)
     przelicz(osoba, pole, prog)
     return zapisana
 
@@ -81,19 +83,24 @@ def usun_dokument(sprawa: Sprawa, dokument_id: str, prog: float | None = None) -
             przed = len(o.pola[pole])
             if usun(o, pole, Kanal.UPLOAD, dokument_id, prog):
                 usuniete += przed - len(o.pola.get(pole, []))
+    for o in sprawa.osoby:   # po usunięciu części przeliczamy wartości scalone
+        for pole in okresy.POLA_SCALANE:
+            if pole in o.pola:
+                okresy.scal(sprawa, o, pole)
+                przelicz(o, pole, prog)
     return usuniete
 
 
 def przelicz(osoba: Osoba, pole: str, prog: float | None = None) -> None:
     """Ustawia flagę `aktywna` – ręczny wybór użytkownika albo najlepsza według hierarchii."""
-    wartosci = osoba.pola.get(pole, [])
+    wartosci = [w for w in osoba.pola.get(pole, []) if w.czesc_z is None]   # części scalone nie biorą udziału
     reczna = osoba.wybor_reczny.get(pole)
     if reczna and not any(w.id == reczna for w in wartosci):
         osoba.wybor_reczny.pop(pole)  # wybrana wartość zniknęła (np. usunięty dokument) → wracamy do automatu
         reczna = None
     wybrana = next((w for w in wartosci if w.id == reczna), None) if reczna else \
         hierarchia.najlepsza(wartosci, prog if prog is not None else prog_pewnosci())
-    for w in wartosci:
+    for w in osoba.pola.get(pole, []):
         w.aktywna = w is wybrana
 
 
@@ -114,7 +121,7 @@ def wybor_aktywnej(osoba: Osoba, pole: str) -> str:
 
 def konflikt(osoba: Osoba, pole: str) -> bool:
     """Konflikt = to samo pole tej samej osoby ma różne wartości z różnych źródeł."""
-    return len({_normalizuj(w.wartosc) for w in osoba.pola.get(pole, [])}) > 1
+    return len({_normalizuj(w.wartosc) for w in osoba.pola.get(pole, []) if w.czesc_z is None}) > 1
 
 
 def konflikty(sprawa: Sprawa) -> list[tuple[str, str]]:

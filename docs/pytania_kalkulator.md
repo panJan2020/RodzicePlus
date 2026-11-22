@@ -81,9 +81,11 @@ odczyt AI z pewnością < 0,6 > `uzytkownik`. Pola `plan` – tylko `kreator`.
 
 | ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
 |---|---|---|---|---|---|---|---|
-| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” | `ezla[]` | rodzic (matka) | fakt | A1 ∋ ciąża | 100% z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | ezla, upload:ZAS-53, upload:Z-3 (okresy), upload:ZAS-12, kreator |
+| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” (okresy z kilku dokumentów tego samego wystawcy scalamy w jedną wartość – sąsiednie i nakładające się; nakładanie to ostrzeżenie, nie konflikt) | `ezla[]` | rodzic (matka) | fakt | A1 ∋ ciąża | 100% z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | ezla, upload:ZAS-53, upload:Z-3 (okresy), upload:ZAS-12, upload:zrzut_zus (e-ZLA; kod tylko z obrazu), kreator |
+| D1a | Czy zwolnienie lekarskie ma kod „B” (ciąża)? | `ezla_kod_b` | rodzic (matka) | fakt | A1 ∋ ciąża | kod nie zmienia PRAWA, tylko stawkę: 100% z kodem B, 80% bez niego (art. 11 ust. 2). Pytamy, gdy kodu nie widać na dokumentach – nigdy go nie zgadujemy | kreator |
 | D2 | Czy przed zwolnieniami z kodem B były zwolnienia bez kodu B? Kiedy się skończyły? | `ezla_przed_ciaza[]` | rodzic (matka) | fakt | D1 niepuste | okresów sprzed przerwy nie wlicza się do okresu zasiłkowego, jeśli po przerwie niezdolność przypada w ciąży (art. 9 ust. 2) | ezla, kreator |
-| D3 | Ile dni wynagrodzenia chorobowego wypłacił pracodawca w tym roku kalendarzowym? | `dni_wynagr_chorobowego_rok` | rodzic | fakt | B1 ∋ umowa o pracę | pierwsze 33 dni (14 dni po roku, w którym skończyłaś 50 lat) płaci pracodawca, potem zasiłek (art. 92 KP); w ciąży również 100% | upload:Z-3 („Informacje o wypłaconych świadczeniach” pkt 1), zus_historia, kreator |
+| D3 | Ile dni wynagrodzenia chorobowego wypłacił pracodawca w tym roku kalendarzowym? | `dni_wynagr_chorobowego_rok` | rodzic | fakt | B1 ∋ umowa o pracę | pierwsze 33 dni (14 dni po roku, w którym skończyłaś 50 lat) płaci pracodawca, potem zasiłek (art. 92 KP). **Reguła zasiłku chorobowego tego pola nie używa** (znaczenie do wyjaśnienia – sekcja Z); druk Z-3 nie podaje liczby dni, tylko okresy (D3a) | zus_historia, kreator |
+| D3a | Za jakie okresy pracodawca wypłacił wynagrodzenie chorobowe? | `wynagrodzenie_chorobowe_okres[]` (od, do, kod) | rodzic | fakt | A1 ∋ ciąża i B1 ∋ umowa o pracę | koniec płatności pracodawcy i początek zasiłku (art. 92 KP); 33 dni (14 po 50. r.ż.) to kontrola i rezerwa, gdy okresu brak (wynik orientacyjny). Druk Z-3, „Informacje o wypłaconych świadczeniach” pkt 1: „okresy od–do oraz kod literowy”, także okresy z poprzedniego roku wliczane do jednego okresu zasiłkowego | upload:Z-3 |
 | D4 | Czy niezdolność do pracy powstała po ustaniu tytułu ubezpieczenia? Data ustania, data początku niezdolności, czy trwała co najmniej 30 dni bez przerwy | `po_ustaniu{}` | rodzic | fakt | D1 i ustał tytuł | prawo, jeśli niezdolność powstała do 14 dni od ustania (art. 7); w ciąży bez limitu 91 dni (art. 8 ust. 2) | upload:ZAS-53, zus_konto, kreator |
 | D5 | Czy po ustaniu tytułu kontynuujesz albo podjęłaś działalność zarobkową? | `praca_po_ustaniu` | rodzic | fakt | D4 = tak | wyłącza zasiłek za okres po ustaniu (art. 13 ust. 1 pkt 2) | kreator |
 | D6 | Czy w czasie zwolnienia wykonujesz pracę zarobkową (także z innego tytułu)? | `praca_na_zwolnieniu` | rodzic | fakt | D1 niepuste | utrata zasiłku za całe zwolnienie (art. 17); od 2027 r. można nie wystawiać zwolnienia z tytułu, w którym da się pracować (art. 17 ust. 1d–1e) | kreator (ostrzeżenie) |
@@ -309,12 +311,12 @@ Jeśli dokument pokazuje, że urlop **już udzielono** (Z-3 pkt 6–7, ZAM), war
 |---|---|---|
 | **ZAS-53** – wniosek o zasiłek chorobowy | uzytkownik | `ezla[]` (okresy), `po_ustaniu{}` („po ustaniu tytułu”), `sytuacja` |
 | **ZAM** (i archiwalne **ZUR**, **ZAO**) – wniosek o zasiłek macierzyński | uzytkownik | `rola`, `data_porodu`, `liczba_dzieci`, `za_zyciem`, `wariant`, `wniosek_81_5_data`, `rodzicielski_czesci[]`, `ojcowski_czesci[]`, dane dziecka |
-| **Z-3** – zaświadczenie płatnika (pracownik); może być „pierwszorazowy” i kilka „w kontynuacji” | pracodawca | `tytuly` (umowa o pracę), `zatrudnienie_od`, `etat`, `umowa_rodzaj`, `urlop_bez_zasilku`, `dni_wynagr_chorobowego_rok`, okresy zasiłków, udzielone urlopy (`macierzynski_od`, `laczenie_praca[]`), `miesiace[]`, `premie_kwartalne[]`, `premie_roczne`, `umowy_u_pracodawcy[]`, `platnik_ponad_20` |
+| **Z-3** – zaświadczenie płatnika (pracownik); może być „pierwszorazowy” i kilka „w kontynuacji” | pracodawca | `tytuly` (umowa o pracę), `zatrudnienie_od`, `etat`, `umowa_rodzaj`, `urlop_bez_zasilku`, `wynagrodzenie_chorobowe_okres[]`, `ezla[]` (okresy zasiłku), okresy zasiłków, udzielone urlopy (`macierzynski_od`, `laczenie_praca[]`), `miesiace[]`, `premie_kwartalne[]`, `premie_roczne`, `umowy_u_pracodawcy[]`, `platnik_ponad_20` |
 | **Z-3a** – zaświadczenie płatnika (zleceniobiorca) | pracodawca | `tytuly` (zlecenie), `przychod_miesiace[]`, `ciaglosc_zlecen`, `platnik_ponad_20` |
 | **Z-3b** (archiwalny) – działalność | pracodawca / uzytkownik | `podstawa_deklarowana[]` |
 | **ZAS-12** – płatnik, dalszy okres | pracodawca | `ezla[]` (kolejne okresy), wypłacone świadczenia |
 | **Poświadczenie ubezpieczenia chorobowego** (wewnętrzny ZUS) | zus | `tytuly`, `chorobowe`, `chorobowe_od`, `okresy_wczesniejsze`, `podstawa_deklarowana[]` / podstawy składek |
-| **Zrzut z systemu ZUS** | zus | okresy ubezpieczenia, tytuły (kod tytułu), przyznane świadczenia (`poprzedni_zasilek`, `rodzicielski_wykorzystany`) |
+| **Zrzut z systemu ZUS** | zus | okresy ubezpieczenia, tytuły (kod tytułu: 0110, 0411, 0510, 0570 – tytuł z kodu, nie z kontekstu), `ezla[]` (zrzut e-ZLA; kod literowy tylko z obrazu), przyznane świadczenia (`poprzedni_zasilek`, `rodzicielski_wykorzystany`) |
 | **Akt urodzenia / zgonu** | urzad | dziecko: `data_urodzenia`, `martwe_urodzenie`, `data_zgonu`; `data_porodu`, `liczba_dzieci` |
 | **Zaświadczenie lekarskie** (przewidywana data porodu, ciąża) | lekarz | `pdp`, `ciaza_w_zatrudnieniu` |
 | **Karta informacyjna szpitala** | lekarz | dziecko: `tydzien_ciazy`, `masa_g`, `hospitalizacje[]`; `matka_szpital[]` |
@@ -334,7 +336,7 @@ albo „Okres” / „Kwota” (dla wyliczeń – wtedy status prawa jest znany,
 
 | Świadczenie | Warunki prawa | Okres | Kwota |
 |---|---|---|---|
-| Zasiłek chorobowy w ciąży | A1, B1, B4–B6, B8, B10–B11, D1, D4–D6 | D1–D3, A4 | C2, O/P/Q (100%) |
+| Zasiłek chorobowy w ciąży | A1, B1, B4–B6, B8, B10–B11, D1, D4–D6 | D1–D3a, A4 | C2, O/P/Q (100%) |
 | Świadczenie rehabilitacyjne | E1–E2, B10 | E3 | O/P/Q, E3–E4 |
 | Zasiłek w wysokości zasiłku macierzyńskiego | F1–F4, B3 | F1 → G1/G2 | O (100%) |
 | Urlop macierzyński | A2, B1 (umowa o pracę), G1–G3, G5 | V: start, przejęcie; I1–I3, K2–K5 | – |
@@ -405,3 +407,9 @@ Pytania o prawo i wyliczenia. Pytania o demo i zakres: `docs/opis_aplikacji.md`,
 6. **Formularze ZUR, ZAO i Z-3b** zlikwidowano od 24.10.2026, ale występują w sprawach testowych. Aplikacja ma je tylko czytać, a nowe wnioski generować na ZAM?
 7. **Art. 9 ust. 4 i art. 17 ust. 1d–1e** wchodzą w życie 1.01.2027. Uwzględniać datę wejścia w życie jako parametr?
 8. **Parametry z lat poprzednich** (sprawy testowe z 2025 r.): czy możecie potwierdzić wartości 2025 (minimalne wynagrodzenie, limity) do wyliczeń w tych sprawach?
+9. **Wyjątki od okresu wyczekiwania zasiłku chorobowego** (30 dni, dobrowolne 90): wliczanie wcześniejszych okresów ubezpieczenia przy przerwie do 30 dni, zwolnienia od wyczekiwania (B6: 10 lat ubezpieczenia, absolwenci) i inne przypadki z art. 4 ustawy zasiłkowej. Reguła ich jeszcze nie stosuje (tylko wskazówka w `co_zrobic`). Numery ustępów do potwierdzenia.
+10. **Czy dni wynagrodzenia chorobowego wliczają się do 270 dni okresu zasiłkowego w ciąży?** Zakładamy, że tak (okres liczony od pierwszego dnia niezdolności, razem z wynagrodzeniem).
+11. **33 dni wynagrodzenia, gdy niezdolność trwa nieprzerwanie na przełomie roku:** czy w nowym roku liczy się nowy limit 33 dni, czy dni z poprzedniego roku? Druk Z-3 prosi o „okresy wynagrodzenia wypłaconego w poprzednim roku wliczane do jednego okresu zasiłkowego”. Dziś liczymy limit od początku niezdolności i tylko ostrzegamy, gdy okres z Z-3 przekracza limit.
+12. **Przerwy między zwolnieniami:** jak liczyć okres zasiłkowy i 33 dni, gdy między zwolnieniami są dni bez zwolnienia (przerwa do 60 dni sumuje okresy)? Dziś liczymy tylko dni objęte zwolnieniem i ostrzegamy o przerwie.
+13. **Granica 50 lat dla 14 dni wynagrodzenia:** zakładamy 14 dni od roku kalendarzowego następującego po tym, w którym pracownik ukończył 50 lat. Prosimy o potwierdzenie.
+14. **`dni_wynagr_chorobowego_rok` (D3):** druk Z-3 nie ma pola „liczba dni”, tylko okresy od–do (D3a). Czy mamy gdzieś indziej wartość, którą ma zawierać to pole (np. historia świadczeń w ZUS), czy pole usunąć?

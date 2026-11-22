@@ -72,11 +72,21 @@ class _Tytul:
     tytul: str
     od: date | None
     do: date | None
-    chorobowe: bool
+    chorobowe: bool | None     # None – nie wiemy (np. odczyt dokumentu bez tej informacji)
+    dobrowolne: bool = False   # ubezpieczenie chorobowe dobrowolne (zlecenie, działalność) – dłuższy okres wyczekiwania
 
 
-def _tytuly_z_okresow(okresy: list[dict[str, Any]]) -> list[_Tytul]:
-    return [_Tytul(o["tytul"], jako_date(o.get("od")), jako_date(o.get("do")), bool(o.get("chorobowe"))) for o in okresy]
+def _tytuly_z_okresow(okresy: list[dict[str, Any]], f: dict[str, Any]) -> list[_Tytul]:
+    """Okresy z ZUS → tytuły. `chorobowe: null` NIE znaczy „brak ubezpieczenia”: umowa o pracę ma chorobowe
+    obowiązkowo (tak), a dla zlecenia i działalności bierzemy odpowiedź B4/B4a, a gdy jej nie ma – „nie wiemy”."""
+    chorobowe = f.get("chorobowe") or {}
+    wynik = []
+    for o in okresy:
+        tytul, ch = o["tytul"], o.get("chorobowe")
+        if ch is None:
+            ch = True if tytul == "umowa_o_prace" else chorobowe.get(tytul, f.get("chorobowe_dobrowolne"))
+        wynik.append(_Tytul(tytul, jako_date(o.get("od")), jako_date(o.get("do")), ch, tytul in TYTULY_DOBROWOLNE))
+    return wynik
 
 
 def _tytuly_z_odpowiedzi(f: dict[str, Any], u: Ustalenie) -> list[_Tytul]:
@@ -97,15 +107,46 @@ def _tytuly_z_odpowiedzi(f: dict[str, Any], u: Ustalenie) -> list[_Tytul]:
             ch = chorobowe.get(t, f.get("chorobowe_dobrowolne"))
             if ch is None:
                 u.brakujace.append("chorobowe_dobrowolne")
-            wynik.append(_Tytul(t, od, None, bool(ch)))
+            wynik.append(_Tytul(t, od, None, bool(ch), dobrowolne=True))
         else:
             wynik.append(_Tytul(t, od, None, False))  # dzieło, inne, brak – bez ubezpieczenia chorobowego
     u.pola += ["tytuly", "umowa_rodzaj", "umowa_do", "chorobowe", "chorobowe_dobrowolne", "chorobowe_od"]
     return wynik
 
 
+def _okres_trwa(t: _Tytul, dzien: date) -> bool:
+    return (t.od is None or t.od <= dzien) and (t.do is None or t.do >= dzien)
+
+
 def _trwa(t: _Tytul, dzien: date) -> bool:
-    return t.chorobowe and (t.od is None or t.od <= dzien) and (t.do is None or t.do >= dzien)
+    return bool(t.chorobowe) and _okres_trwa(t, dzien)
+
+
+def tytuly_ubezpieczenia(f: dict[str, Any], u: Ustalenie) -> list[_Tytul] | None:
+    """Tytuły ubezpieczenia osoby: z okresów ZUS (B5a), a gdy ich nie ma – z odpowiedzi B1, B3, B4, B5.
+    None – brak danych (nazwy pól w `u.brakujace`). Wspólne dla zasiłku macierzyńskiego i chorobowego."""
+    okresy = f.get("okresy_ubezpieczenia")
+    if okresy:
+        u.pola.append("okresy_ubezpieczenia")
+        return _tytuly_z_okresow(okresy, f)
+    if f.get("tytuly") is None:
+        u.brakujace.append("tytuly")
+        return None
+    return _tytuly_z_odpowiedzi(f, u)
+
+
+def tytuly_z_chorobowym(tytuly: list[_Tytul], dzien: date) -> list[_Tytul]:
+    """Tytuły, z których w tym dniu podlega się ubezpieczeniu chorobowemu."""
+    return [t for t in tytuly if _trwa(t, dzien)]
+
+
+def nieznane_chorobowe(tytuly: list[_Tytul], dzien: date, u: Ustalenie) -> bool:
+    """Trwający w tym dniu tytuł bez informacji o chorobowym (zlecenie / działalność) → brak danych (B4a)."""
+    if any(t.chorobowe is None and _okres_trwa(t, dzien) for t in tytuly):
+        u.brakujace.append("chorobowe_dobrowolne")
+        u.pola += ["chorobowe", "chorobowe_dobrowolne"]
+        return True
+    return False
 
 
 def ubezpieczony_w_dniu(f: dict[str, Any], dzien: date | None, p: dict[str, Any]) -> Ustalenie:
@@ -117,16 +158,8 @@ def ubezpieczony_w_dniu(f: dict[str, Any], dzien: date | None, p: dict[str, Any]
     u = Ustalenie()
     if dzien is None:
         u.brakujace += ["data_porodu", "pdp"]
-    okresy = f.get("okresy_ubezpieczenia")
-    if okresy:
-        tytuly = _tytuly_z_okresow(okresy)
-        u.pola.append("okresy_ubezpieczenia")
-    elif f.get("tytuly") is None:
-        u.brakujace.append("tytuly")
-        return u
-    else:
-        tytuly = _tytuly_z_odpowiedzi(f, u)
-    if u.brakujace:
+    tytuly = tytuly_ubezpieczenia(f, u)
+    if tytuly is None or u.brakujace or (dzien is not None and nieznane_chorobowe(tytuly, dzien, u)):
         return u
 
     trwajace = [t for t in tytuly if _trwa(t, dzien)]

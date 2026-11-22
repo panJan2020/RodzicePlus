@@ -333,6 +333,9 @@ class WartoscPola {
     this.pewnosc = 1,
     this.doSprawdzenia = false,
     this.aktywna = false,
+    this.uwagi = const [],
+    this.czesci = const [],
+    this.czescZ,
   });
 
   final String id;
@@ -345,6 +348,9 @@ class WartoscPola {
   final double pewnosc;
   final bool doSprawdzenia; // niepewny odczyt AI
   final bool aktywna;
+  final List<String> uwagi; // ostrzeżenia do sprawdzenia, np. okresy z różnych dokumentów się nakładają
+  final List<String> czesci; // wartość scalona: id wartości-części, z których powstała
+  final String? czescZ; // wartość-część: id wartości scalonej, która ją uwzględnia
 
   factory WartoscPola.fromJson(Map<String, dynamic> j) => WartoscPola(
         id: j['id'] as String,
@@ -357,6 +363,9 @@ class WartoscPola {
         pewnosc: ((j['pewnosc'] as num?) ?? 1).toDouble(),
         doSprawdzenia: (j['do_sprawdzenia'] as bool?) ?? false,
         aktywna: (j['aktywna'] as bool?) ?? false,
+        uwagi: _teksty(j['uwagi']),
+        czesci: _teksty(j['czesci']),
+        czescZ: j['czesc_z'] as String?,
       );
 }
 
@@ -576,15 +585,20 @@ class Warunek {
 }
 
 class OkresWyniku {
-  const OkresWyniku({required this.odDnia, required this.doDnia, required this.tygodnie});
+  const OkresWyniku({required this.odDnia, required this.doDnia, this.tygodnie, this.dni});
   final DateTime odDnia;
   final DateTime doDnia;
-  final int tygodnie;
+  final int? tygodnie; // urlopy
+  final int? dni; // zasiłek chorobowy
+
+  /// „20 tyg.” albo „66 dni” – zależnie od rodzaju świadczenia.
+  String? get dlugoscTekst => tygodnie != null ? '$tygodnie tyg.' : (dni != null ? '$dni dni' : null);
 
   factory OkresWyniku.fromJson(Map<String, dynamic> j) => OkresWyniku(
         odDnia: DateTime.parse(j['od'] as String),
         doDnia: DateTime.parse(j['do'] as String),
-        tygodnie: j['tygodnie'] as int,
+        tygodnie: j['tygodnie'] as int?,
+        dni: j['dni'] as int?,
       );
 }
 
@@ -628,6 +642,8 @@ class WynikSwiadczenia {
     this.podsumowanie = '',
     this.okres,
     this.kwota,
+    this.stawka,
+    this.okresWynagrodzenia,
     this.uzasadnienie = const [],
     this.powody = const [],
     this.warunki = const [],
@@ -652,6 +668,8 @@ class WynikSwiadczenia {
   final String podsumowanie;
   final OkresWyniku? okres; // null przy nie_przysluguje / brak_danych
   final KwotaWyniku? kwota; // null, gdy brakuje danych do kwoty
+  final String? stawka; // zasiłek chorobowy: "1.00" | "0.80", gdy kwoty jeszcze nie liczymy
+  final OkresWyniku? okresWynagrodzenia; // zasiłek chorobowy pracownika: wynagrodzenie płacone przez pracodawcę
   final List<String> uzasadnienie;
   final List<Powod> powody;
   final List<Warunek> warunki;
@@ -676,6 +694,10 @@ class WynikSwiadczenia {
         podsumowanie: j['podsumowanie'] as String? ?? '',
         okres: j['okres'] == null ? null : OkresWyniku.fromJson(j['okres'] as Map<String, dynamic>),
         kwota: j['kwota'] == null ? null : KwotaWyniku.fromJson(j['kwota'] as Map<String, dynamic>),
+        stawka: j['stawka'] as String?,
+        okresWynagrodzenia: j['okres_wynagrodzenia'] == null
+            ? null
+            : OkresWyniku.fromJson(j['okres_wynagrodzenia'] as Map<String, dynamic>),
         uzasadnienie: _teksty(j['uzasadnienie']),
         powody: [for (final p in (j['powody'] as List? ?? [])) Powod.fromJson(p as Map<String, dynamic>)],
         warunki: [for (final w in (j['warunki'] as List? ?? [])) Warunek.fromJson(w as Map<String, dynamic>)],

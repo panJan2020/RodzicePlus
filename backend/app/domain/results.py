@@ -37,7 +37,8 @@ class Warunek(BaseModel):
 class OkresWyniku(BaseModel):
     od: date
     do: date
-    tygodnie: int
+    tygodnie: int | None = None      # urlopy – liczba tygodni
+    dni: int | None = None           # zasiłek chorobowy – liczba dni zasiłku (bez przerw między zwolnieniami)
 
 
 class KwotaWyniku(BaseModel):
@@ -58,6 +59,8 @@ class WynikSwiadczenia(BaseModel):
     podsumowanie: str                # jedno zdanie dla użytkownika
     okres: OkresWyniku | None = None
     kwota: KwotaWyniku | None = None # None – nie da się jeszcze policzyć (braki w `brakujace_pola`)
+    stawka: str | None = None        # "1.00" | "0.80" – gdy znamy stawkę, a kwoty jeszcze nie liczymy (zasiłek chorobowy)
+    okres_wynagrodzenia: OkresWyniku | None = None   # zasiłek chorobowy: wynagrodzenie, które wypłaca pracodawca
     kto_wyplaca: str | None = None   # "platnik" | "zus" | None (nie wiemy – patrz kto_wyplaca_opis)
     kto_wyplaca_opis: str | None = None
     gdzie_zlozyc: str | None = None

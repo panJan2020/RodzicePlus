@@ -177,7 +177,7 @@ def test_schematy_scisle_dla_structured_outputs():
     for typ in TYPY:
         sprawdz(schemat_odczytu(typ))
     z3 = schemat_odczytu("Z-3")["properties"]
-    assert {"pola", "miesiace", "ezla"} == set(z3)
+    assert {"pola", "miesiace", "ezla", "wynagrodzenie_chorobowe_okres"} == set(z3)
     assert {"etat", "zatrudnienie_od", "platnik_ponad_20"} <= set(z3["pola"]["items"]["properties"]["pole"]["enum"])
     assert "osoba" not in z3["pola"]["items"]["properties"]   # dokument jednej osoby
     assert "ezla" in schemat_odczytu("ZAS-53")["properties"]
@@ -227,3 +227,25 @@ def test_schematy_mieszcza_sie_w_limicie_unii_api():
     for typ in TYPY:
         sch = schemat_odczytu(typ)
         assert sch is None or unie(sch) <= 16, typ
+
+
+def test_okres_wynagrodzenia_chorobowego_z_z3_i_kod_zwolnienia_tylko_z_obrazu():
+    s = _sprawa()
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="Z-3", strony=[5, 6, 7, 8]), {
+        "wynagrodzenie_chorobowe_okres": [{"od": "2026-02-18", "do": "2026-03-22", "kod": None, "strona": 4,
+                                           "pewnosc": 0.9}],
+        "ezla": [{"od": "2026-03-08", "do": "2026-04-01", "kod": "B", "strona": 2, "pewnosc": 0.9},
+                 {"od": "2026-04-02", "do": "2026-04-03", "kod": None, "strona": 2, "pewnosc": 0.85}]})
+    matka = s.osoby[0]
+    w = matka.aktywna("wynagrodzenie_chorobowe_okres")
+    assert w.wartosc == [{"od": "2026-02-18", "do": "2026-03-22", "kod": None}]   # brak kodu na dokumencie = null
+    assert w.wystawca == Wystawca.PRACODAWCA and w.zrodlo_opis == "Z-3, str. 8"
+    assert [o["kod"] for o in matka.aktywna("ezla").wartosc] == ["B", None]
+
+
+def test_druk_z3_nie_ma_liczby_dni_wynagrodzenia_tylko_okresy():
+    """Pkt 1 druku Z-3 pyta o okresy od–do (art. 92 KP), więc `dni_wynagr_chorobowego_rok` nie jest czytane z Z-3."""
+    from app.extraction.schema import schemat_odczytu
+    z3 = schemat_odczytu("Z-3")["properties"]
+    assert "wynagrodzenie_chorobowe_okres" in z3
+    assert "dni_wynagr_chorobowego_rok" not in z3["pola"]["items"]["properties"]["pole"]["enum"]

@@ -66,6 +66,9 @@ class WartoscPola(BaseModel):
     strona: int | None = None
     pewnosc: float = 1.0              # 0–1; < 1 tylko dla odczytu AI
     aktywna: bool = False             # ustawia wyłącznie merge
+    uwagi: list[str] = Field(default_factory=list)   # ostrzeżenia do sprawdzenia (np. okresy z dokumentów się nakładają)
+    czesci: list[str] = Field(default_factory=list)  # wartość scalona: id wartości, z których powstała (merge/okresy.py)
+    czesc_z: str | None = None        # wartość jest częścią wartości scalonej o tym id (nieaktywna, bez konfliktu)
     utworzono: datetime = Field(default_factory=_teraz)
 
 

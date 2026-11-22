@@ -18,7 +18,7 @@ from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulator
 from app.merge.scalanie import prog_pewnosci
 from app.params.store import get_params
 from app.questions import engine
-from app.rules import DLA_ROL, REGULY, wyliczone
+from app.rules import DATA_PRAWA, DLA_ROL, REGULY, wyliczone
 from app.rules.wspolne import Kontekst
 
 router = APIRouter(prefix="/sprawy/{sprawa_id}", tags=["świadczenia i kalkulator"])
@@ -65,12 +65,14 @@ def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -
         for kod, regula in REGULY.items():
             if o.rola.value not in DLA_ROL[kod]:
                 continue
-            for r in regula(k, p):
+            data_prawa = DATA_PRAWA[kod](k.fakty, k.wybory)       # parametry z dnia powstania prawa tego świadczenia
+            pr = get_params(data_prawa) if data_prawa else p
+            for r in regula(k, pr):
                 wyniki.append(WynikSwiadczenia(
                     **r.model_dump(exclude={"brakujace", "pola_do_potwierdzenia"}), osoba_id=o.id,
                     scenariusz_id=scenariusz.SCENARIUSZ_DOMYSLNY, brakujace_pola=_brakujace(s, o, r.brakujace),
                     pola_do_potwierdzenia=_do_potwierdzenia(r.pola_do_potwierdzenia),
-                    wersja_parametrow=p["obowiazuje_od"]))
+                    wersja_parametrow=pr["obowiazuje_od"]))
     return wyniki
 
 

@@ -190,7 +190,13 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "zrodlo_opis": "Zaświadczenie lekarskie, str. 1",   // gotowy tekst do „Skąd to wiemy”
  "dokument_id": "d3", "strona": 1, "pewnosc": 0.92,
  "do_sprawdzenia": false,         // true, gdy pewnosc < 0,6
+ "uwagi": [],                     // ostrzeżenia do sprawdzenia, np. „Okresy z różnych dokumentów nakładają się: 08.05.2026.”
+ "czesci": [],                    // wartość scalona (np. zwolnienia z 4 Z-3): id wartości-części, z których powstała
+ "czesc_z": null,                 // wartość-część: id wartości scalonej, w której jest uwzględniona (nieaktywna, bez konfliktu)
  "aktywna": true, "utworzono": "2026-11-22T01:10:00Z"}
+// Pola typu „okresy” (`ezla`): wartości tego samego wystawcy z kilku dokumentów są scalane w jedną wartość
+// (sąsiednie i nakładające się okresy o tym samym kodzie łączą się; nakładanie to ostrzeżenie w `uwagi`, nie konflikt).
+// Części zostają w `wartosci` z dokumentem i stroną – UI może je pokazać pod wartością scaloną.
 
 // Pytanie (element DaneOsoby i odpowiedź /pytania)
 {"id": "G1", "sekcja": "G", "pole": "pdp",
@@ -315,7 +321,10 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
                                   // warunkowo – poród jeszcze się nie odbył (nigdy automatyczna odmowa);
                                   // nie_przysluguje – tylko po porodzie
  "podsumowanie": "Przysługuje Ci zasiłek za 20 tygodni urlopu macierzyńskiego (od 10.03.2027 do 27.07.2027), o ile w dniu porodu nadal będziesz ubezpieczona – 7 075,78 zł miesięcznie brutto.",
- "okres": {"od": "2027-03-10", "do": "2027-07-27", "tygodnie": 20},        // null przy nie_przysluguje / brak_danych
+ "okres": {"od": "2027-03-10", "do": "2027-07-27", "tygodnie": 20, "dni": null},   // null przy nie_przysluguje / brak_danych
+                                  // zasiłek chorobowy: "tygodnie": null, "dni": 66 (dni zasiłku bez przerw między zwolnieniami)
+ "stawka": null,                  // zasiłek chorobowy w ciąży: "1.00" (kod B) | "0.80" – gdy kwoty jeszcze nie liczymy
+ "okres_wynagrodzenia": null,     // zasiłek chorobowy pracownika: {"od","do","dni"} – wynagrodzenie płacone przez pracodawcę
  "kwota": {"miesieczna": "7075.78", "za_okres": "33020.40", "stawka": "1.00", "stawka_dzienna": "235.86",
            "podstawa_wymiaru": "7075.78", "brutto": true},                  // null, gdy brakuje danych do kwoty
  "kto_wyplaca": "platnik",        // zus | platnik | null (nie wiemy – C1 „nie wiem”; tekst w kto_wyplaca_opis)

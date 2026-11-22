@@ -378,7 +378,9 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 
 ### Etap 2 – Upload end-to-end (najważniejsze dla jury)
 - [ ] Upload wielu plików, zadanie w tle, klasyfikacja, podział na egzemplarze, odczyt, merge, wyniki.
-- [ ] Reguła zasiłku chorobowego w ciąży (kod B, okres wyczekiwania, 33/14 dni, 270 dni, kto wypłaca).
+  (2a: pipeline odczytu gotowy _(22.11.2026)_; zostają ekrany – etap 3 – i wyniki po uploadzie w UI)
+- [x] Reguła zasiłku chorobowego w ciąży (kod B, okres wyczekiwania, 33/14 dni, 270 dni, kto wypłaca). _(22.11.2026)_
+  (2b: status, okres, stawka i kto wypłaca; `kwota: null` – złotówki w 2c; sprawa Anny: przysługuje od 23.03.2025, ZUS)
 - [ ] Indywidualna podstawa wymiaru: pracownik (z miesięcy z Z-3), zleceniobiorca, działalność (art. 48a).
 - [ ] Porównanie z decyzją ZUS + `tests/golden/run` z tabelą zgodności.
 - **Gotowe, gdy:** sprawa Anny daje „przysługuje”, zgodnie z decyzją ZUS.
@@ -396,6 +398,10 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 - [ ] Przełączanie źródła pola, zakładka konfliktów z niespójnościami, kreator krok po kroku (tylko braki),
   wynik orientacyjny z polami do potwierdzenia.
 - **Gotowe, gdy:** zmiana źródła pola przelicza wyniki świadczeń.
+- **Znana niedoskonałość UI (do etapu 5):** pole `ezla` ze ZAS-53 (użytkownik, cały okres) i ze scalonych Z-3 (pracodawca,
+  tylko część okresu) to dwie różne wartości, więc „Moje dane” pokażą konflikt, choć nic sobie nie przeczy. Konflikt nie
+  blokuje wyniku (reguła bierze początek niezdolności także z okresu wynagrodzenia chorobowego z Z-3). Rozwiązanie:
+  w etapie 5 traktować okresy jako sumę wszystkich źródeł albo nie zgłaszać konfliktu, gdy jeden okres zawiera drugi.
 
 ### Etap 6 – Pozostałe świadczenia i sytuacje
 - [ ] Świadczenie rehabilitacyjne, zasiłek w wysokości zasiłku macierzyńskiego, działalność + zadłużenie,

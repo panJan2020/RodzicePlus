@@ -230,12 +230,13 @@ def test_api_anna_ciaza_warunkowo_z_kwota_orientacyjna_art29():
     sid, h = _konto("anna")
     assert _odp(sid, h, sytuacja=["ciaza"], pdp="2027-03-10").status_code == 200
     wyniki = c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()
-    assert [w["swiadczenie"] for w in wyniki] == [URLOP_MACIERZYNSKI, URLOP_RODZICIELSKI]
+    assert [w["swiadczenie"] for w in wyniki] == [URLOP_MACIERZYNSKI, URLOP_RODZICIELSKI, "zasilek_chorobowy_ciaza"]
+    assert wyniki[2]["status"] == "brak_danych" and wyniki[2]["brakujace_pola"][0]["pytanie_id"] == "D1"  # brak zwolnienia
     w = wyniki[0]
     assert w["status"] == "warunkowo" and w["scenariusz_id"] == "domyslny" and w["orientacyjny"] is True
     assert w["kwota"] == {"miesieczna": "7075.78", "za_okres": "33020.40", "stawka": "1.00",
                           "stawka_dzienna": "235.86", "podstawa_wymiaru": "7075.78", "brutto": True}
-    assert w["okres"] == {"od": "2027-03-10", "do": "2027-07-27", "tygodnie": 20}
+    assert w["okres"] == {"od": "2027-03-10", "do": "2027-07-27", "tygodnie": 20, "dni": None}
     assert w["warunki"] == [{"opis": "Ubezpieczenie chorobowe w dniu porodu",
                              "ryzyko": "brak_ubezpieczenia_w_dniu_porodu"}]
     potw = {x["pytanie_id"] for x in w["pola_do_potwierdzenia"]}
@@ -264,3 +265,14 @@ def test_api_kalkulator_powrot_do_pracy_i_ostrzezenia():
     assert k["osoby"][0]["powrot_do_pracy"] == "2027-07-09"  # 10.07.2026 + 52 tygodnie (364 dni)
     assert k["okresy"][0]["stawka_dzienna"] == "235.86" and k["orientacyjny"] is True
     assert any("wyłącznie drugiemu rodzicowi" in x for x in k["ostrzezenia"])
+
+
+def test_zasilek_macierzynski_z_okresem_zus_bez_informacji_o_chorobowym_art29():
+    """Regresja: `chorobowe: null` w okresie (np. ze zrzutu ZUS) nie może odbierać prawa umowie o pracę."""
+    f = {**PRACOWNICA, "okresy_ubezpieczenia": [{**OKRES_UOP, "chorobowe": None}]}
+    mac, rodz = _licz(f)
+    assert mac.status == rodz.status == Status.PRZYSLUGUJE and mac.brakujace == []
+    zlecenie = {**PRACOWNICA, "tytuly": ["zlecenie"], "okresy_ubezpieczenia": [{**OKRES_UOP, "tytul": "zlecenie",
+                                                                               "chorobowe": None}]}
+    mac, _ = _licz(zlecenie)
+    assert mac.status == Status.BRAK_DANYCH and "chorobowe_dobrowolne" in mac.brakujace
