@@ -161,6 +161,10 @@ Backend – Python FastAPI                                          ▼
 13. Nie zmieniaj plików poza zakresem zadania. Małe commity, opis po polsku.
 14. Nie używaj logo ZUS ani gov.pl i nie udawaj oficjalnego serwisu. Styl ma być **inspirowany**, a w stopce
     ma być informacja „Prototyp HackNation 2026 – nie jest oficjalnym serwisem ZUS”.
+15. **Parametry wybieramy po dacie prawa** (`params.store.parametry_na_dzien`), nigdy „najnowsze”. Gdy nie ma pliku na rok
+    tej daty, **nie zmieniamy roku po cichu**: bierzemy najbliższą wersję i dopisujemy widoczne ostrzeżenie do `uwagi`
+    wyniku (robi to `api/swiadczenia.py`). Wartości, których nie umiemy zweryfikować, oznaczamy `do_weryfikacji`
+    w pliku parametrów i dopisujemy do sekcji Z w `docs/pytania_kalkulator.md`.
 
 ---
 
@@ -387,6 +391,11 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 
 ### Etap 3 – Ekrany ścieżki jury
 - [ ] Logowanie → Start → Dokumenty (upload, odczytane dane, porównanie) → Moje świadczenia (wynik z uzasadnieniem).
+- [ ] **Karta „zasiłek chorobowy – brak danych” nie może się wyświetlać każdej matce.** `GET /swiadczenia` zwraca dziś
+  wynik zasiłku chorobowego w ciąży także wtedy, gdy matka nie ma zwolnień (status `brak_danych`). Ekran „Moje świadczenia”
+  pokazuje kartę świadczenia tylko, gdy jest po co: są zwolnienia (`ezla`) albo użytkownik wskazał sytuację z niezdolnością
+  do pracy w ciąży; w innym razie świadczenie jest w katalogu „Co jeszcze może Ci przysługiwać”, a nie jako karta z brakiem
+  danych. Zdecyduj, czy filtruje backend (pole `dotyczy` w wyniku), czy widok.
 - **Gotowe, gdy:** jury może wgrać PDF i zobaczyć wynik na telefonie i komputerze.
 
 ### Etap 4 – Kalkulator zintegrowany

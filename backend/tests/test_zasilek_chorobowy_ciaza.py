@@ -304,3 +304,49 @@ def test_od_dokumentow_do_wyniku_przez_merge_i_api_art4_art92():
     assert [b["pytanie_id"] for b in wynik["brakujace_pola"]] == ["D1a"]       # pytanie o kod B
     assert "D1" in [p["pytanie_id"] for p in wynik["pola_do_potwierdzenia"]]    # nakładanie okresów → do sprawdzenia
     assert wynik["wersja_parametrow"] == "2026-01-01"
+
+
+# ---------- poprawki po 2b: wiek tylko jako zapas, parametry po dacie prawa ----------
+
+def test_nie_pytamy_o_date_urodzenia_gdy_jest_okres_wynagrodzenia_z_z3_art92():
+    f = {k: v for k, v in ANNA.items() if k != "data_urodzenia"}
+    w = _licz(f)
+    assert "data_urodzenia" not in w.brakujace
+    assert w.okres.od == date(2026, 3, 23)
+
+
+def test_pytamy_o_date_urodzenia_tylko_gdy_brak_okresu_wynagrodzenia_art92():
+    f = {k: v for k, v in _bez_wynagrodzenia().items() if k != "data_urodzenia"}
+    w = _licz(f)
+    assert "data_urodzenia" in w.brakujace and w.orientacyjny is True
+
+
+def test_jedynym_powodem_orientacyjnego_u_anny_jest_brak_kodu_b_art11():
+    pochodzenie = {"ezla": WartoscPola(wartosc=ANNA["ezla"], wystawca=Wystawca.PRACODAWCA, kanal=Kanal.UPLOAD,
+                                       zrodlo_opis="Z-3", pewnosc=0.9)}
+    f = {k: v for k, v in ANNA.items() if k != "data_urodzenia"}
+    bez_kodu = _licz(f, pochodzenie=pochodzenie)
+    assert bez_kodu.orientacyjny is True and bez_kodu.brakujace == ["ezla_kod_b"]
+    z_kodem = _licz({**f, "ezla": _dni(date(2026, 3, 8), 81, "B")}, pochodzenie=pochodzenie)
+    assert z_kodem.orientacyjny is False and z_kodem.brakujace == [] and z_kodem.stawka == "1.00"
+
+
+def test_brak_parametrow_na_rok_daje_widoczne_ostrzezenie_w_uwagach_api():
+    sid = c.post("/sprawy").json()["id"]
+    s = memory.pobierz(sid)
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="Z-3", strony=[1], osoby=["matka"]), {
+        "ezla": [_wiersze("2025-03-08", "2025-05-27")], "wynagrodzenie_chorobowe_okres": [
+            _wiersze("2025-02-18", "2025-03-22")],
+        "pola": [{"pole": "zatrudnienie_od", "wartosc": "2024-10-01", "strona": 1, "pewnosc": 0.9},
+                 {"pole": "platnik_ponad_20", "wartosc": "do_20", "strona": 1, "pewnosc": 0.9}]})
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="zrzut_systemu_ZUS", strony=[2], osoby=["matka"]), {
+        "pola": [{"pole": "tytuly", "wartosc": "umowa_o_prace", "tytul": "umowa_o_prace", "strona": 1, "pewnosc": 0.9}],
+        "okresy_ubezpieczenia": [{"kod_tytulu": "0110", "tytul": "umowa_o_prace", "platnik": None,
+                                  "od": "2024-10-01", "do": None, "chorobowe": None, "chorobowe_dobrowolne": None,
+                                  "strona": 1, "pewnosc": 0.9}]})
+    memory.zapisz(s)
+    c.post(f"/sprawy/{sid}/odpowiedzi", json=[{"pole": "sytuacja", "wartosc": ["ciaza"]}])
+    wynik = next(w for w in c.get(f"/sprawy/{sid}/swiadczenia").json() if w["swiadczenie"] == "zasilek_chorobowy_ciaza")
+    assert wynik["status"] == "przysluguje" and wynik["okres"]["od"] == "2025-03-23"
+    assert wynik["uwagi"][0].startswith("Brak parametrów prawnych na rok 2025")      # nie cichy fallback
+    assert wynik["wersja_parametrow"] == "2026-01-01"

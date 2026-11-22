@@ -16,7 +16,7 @@ from app.domain.model import ROLE_RODZICA, Osoba, Rola, Sprawa
 from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulatora, WynikKalkulatora,
                                 WynikSwiadczenia)
 from app.merge.scalanie import prog_pewnosci
-from app.params.store import get_params
+from app.params.store import get_params, parametry_na_dzien
 from app.questions import engine
 from app.rules import DATA_PRAWA, DLA_ROL, REGULY, wyliczone
 from app.rules.wspolne import Kontekst
@@ -66,8 +66,10 @@ def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -
             if o.rola.value not in DLA_ROL[kod]:
                 continue
             data_prawa = DATA_PRAWA[kod](k.fakty, k.wybory)       # parametry z dnia powstania prawa tego świadczenia
-            pr = get_params(data_prawa) if data_prawa else p
+            pr, ostrzezenie = parametry_na_dzien(data_prawa) if data_prawa else (p, None)
             for r in regula(k, pr):
+                if ostrzezenie:   # brak parametrów na ten rok – widoczne ostrzeżenie, nie cichy fallback
+                    r.uwagi.insert(0, ostrzezenie)
                 wyniki.append(WynikSwiadczenia(
                     **r.model_dump(exclude={"brakujace", "pola_do_potwierdzenia"}), osoba_id=o.id,
                     scenariusz_id=scenariusz.SCENARIUSZ_DOMYSLNY, brakujace_pola=_brakujace(s, o, r.brakujace),

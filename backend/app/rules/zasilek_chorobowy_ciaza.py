@@ -179,8 +179,10 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
         elif liczba < limit_wyn and r.dni_niezdolnosci[-1] > koniec:
             w.uwagi.append(f"Pracodawca wypłacił wynagrodzenie za {dni_tekst(liczba)} (do {_d(koniec)}), a limit to "
                            f"{dni_tekst(limit_wyn)}, choć zwolnienie trwa dalej – zapytaj w kadrach, dlaczego.")
-    if pracownik and f.get("data_urodzenia") is None:
-        w.brakujace.append("data_urodzenia")   # limit 33 / 14 dni zależy od wieku – bez daty liczymy 33
+    if r.wynagrodzenie_zalozone and f.get("data_urodzenia") is None:
+        # Limit 33 / 14 dni zależy od wieku, ale tylko gdy nie znamy okresu wynagrodzenia z Z-3 (zapas) –
+        # wtedy pytamy o datę urodzenia; z okresem w dokumencie nie pytamy.
+        w.brakujace.append("data_urodzenia")
 
     # ---- 5. kto wypłaca zasiłek ----
     kto, opis, brak_c1 = kto_wyplaca({**f, "tytuly": [t.tytul]}, p)
