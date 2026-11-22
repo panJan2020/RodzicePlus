@@ -16,7 +16,7 @@ from app import config
 from app.domain.model import Dokument, Sprawa
 from app.extraction import cache, claude_client, mapowanie, pdf, prompts
 from app.extraction.podzial import Fragment, podziel
-from app.extraction.schema import TYPY, WERSJA, schemat_klasyfikacji, schemat_odczytu
+from app.extraction.schema import TYPY, WERSJA, WERSJA_KLASYFIKACJI, schemat_klasyfikacji, schemat_odczytu
 
 Postep = Callable[[str, float, str], None]          # (etap, postęp 0–1 w obrębie pliku, komunikat)
 Zapytaj = Callable[[bytes, str, dict[str, Any], str], dict[str, Any]]
@@ -56,12 +56,13 @@ def przetworz_plik(s: Sprawa, plik: str, dane: bytes, postep: Postep | None = No
     zapytaj = zapytaj or claude_client.zapytaj
     sha = pdf.skrot(dane)
     prefiks = f"{sha}.{WERSJA}.{config.CLAUDE_MODEL}"
+    prefiks_klas = f"{sha}.{WERSJA_KLASYFIKACJI}.{config.CLAUDE_MODEL}"  # zmiana odczytu nie powtarza klasyfikacji
     wywolania: list[dict[str, Any]] = []
 
     # 1. klasyfikacja stron
     postep("klasyfikacja", 0.05, "Rozpoznajemy dokumenty…")
     n = pdf.liczba_stron(dane)
-    klas = _z_cache(f"{prefiks}.klasyfikacja",
+    klas = _z_cache(f"{prefiks_klas}.klasyfikacja",
                     lambda: zapytaj(dane, prompts.KLASYFIKACJA, schemat_klasyfikacji(), "klasyfikacja"),
                     wywolania, "klasyfikacja")
     strony = _uzupelnij_strony(klas.get("strony") or [], n)

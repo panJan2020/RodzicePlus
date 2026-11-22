@@ -33,13 +33,13 @@ def main(sciezka: str) -> None:
     wynik = pipeline.przetworz_plik(s, plik.name, plik.read_bytes(), postep=postep)
 
     print("\n## Strony")
-    print("| str. | typ | wariant | x z y | początek | osoba | obrócona |")
-    print("|---|---|---|---|---|---|---|")
+    print("| str. | typ | wariant | x z y | początek | osoba | obrócona | opis |")
+    print("|---|---|---|---|---|---|---|---|")
     for st in wynik.strony:
         xy = f"{st['strona_formularza']} z {st['stron_formularza']}" if st.get("strona_formularza") else "–"
         print(f"| {st['strona']} | {st['typ']} | {st.get('wariant') or '–'} | {xy} | "
               f"{'tak' if st.get('poczatek_formularza') else ''} | {st.get('osoba') or '–'} | "
-              f"{'tak' if st.get('obrocona') else ''} |")
+              f"{'tak' if st.get('obrocona') else ''} | {_krotko(st.get('opis') or '', 60)} |")
 
     print("\n## Dokumenty")
     print("| id | typ | wariant | strony | wystawca | pól | do sprawdzenia | informacja |")

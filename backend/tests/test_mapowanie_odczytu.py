@@ -59,9 +59,9 @@ def po_odczycie():
 def test_jedno_wywolanie_klasyfikacji_i_jedno_na_dokument_z_polami(po_odczycie):
     _, wynik, wywolane = po_odczycie
     assert wywolane == ["klasyfikacja", "odczyt:ZAS-53", "odczyt:pismo_ZUS"] + ["odczyt:Z-3"] * 4 + \
-        ["odczyt:zrzut_systemu_ZUS", "odczyt:decyzja_ZUS"]
+        ["odczyt:zrzut_systemu_ZUS", "odczyt:decyzja_ZUS"]   # strona „inne” bez wywołania
     assert [d.typ for d in wynik.dokumenty] == ["ZAS-53", "pismo_ZUS", "Z-3", "Z-3", "Z-3", "Z-3",
-                                                "zrzut_systemu_ZUS", "decyzja_ZUS"]
+                                                "zrzut_systemu_ZUS", "decyzja_ZUS", "inne"]
 
 
 def test_wystawca_wg_typu_i_strona_z_oryginalnego_pliku(po_odczycie):
@@ -101,7 +101,7 @@ def test_pismo_zus_bez_pol_tylko_informacja(po_odczycie):
 
 def test_decyzja_zus_tylko_w_oczekiwanym_wyniku(po_odczycie):
     s, wynik, _ = po_odczycie
-    decyzja = wynik.dokumenty[-1]
+    decyzja = wynik.dokumenty[7]
     assert s.oczekiwany_wynik == "Wypłacono zasiłek chorobowy za okres zwolnienia."
     assert decyzja.rola == "decyzja_zus" and decyzja.liczba_pol == 0
     assert not any(w.dokument_id == decyzja.id for o in s.osoby for lista in o.pola.values() for w in lista)
@@ -121,27 +121,41 @@ def test_usuniecie_dokumentu_usuwa_jego_wartosci(po_odczycie):
     assert not mapowanie.usun_dokument(s, "d999")
 
 
-def test_pole_dziecka_trafia_do_dziecka_a_plan_jest_pomijany():
+def _pola(*wpisy):
+    return {"pola": [{"pole": p, "wartosc": w, "osoba": o, "strona": s, "pewnosc": pe} for p, w, o, s, pe in wpisy]}
+
+
+def test_pole_dziecka_trafia_do_dziecka_a_nieprawidlowe_wartosci_sa_odrzucane():
     s = _sprawa()
     frag = Fragment(typ="ZAM", strony=[3, 4], osoby=["matka"])
-    mapowanie.zapisz_dokument(s, "x.pdf", frag, {
-        "za_zyciem": [{"wartosc": True, "osoba": "dziecko", "strona": 2, "pewnosc": 0.8}],
-        "data_urodzenia": [{"wartosc": "2026-07-01", "osoba": "dziecko", "strona": 1, "pewnosc": 0.9},
-                           {"wartosc": "1994-01-01", "osoba": "matka", "strona": 1, "pewnosc": 0.9}],
-        "data_porodu": [{"wartosc": "nieczytelne", "osoba": "matka", "strona": 1, "pewnosc": 0.3}],
-    })
+    mapowanie.zapisz_dokument(s, "x.pdf", frag, _pola(
+        ("za_zyciem", "tak", "dziecko", 2, 0.8),
+        ("data_urodzenia", "2026-07-01", "dziecko", 1, 0.9),
+        ("data_urodzenia", "1994-01-01", "matka", 1, 0.9),
+        ("data_porodu", "nieczytelne", "matka", 1, 0.3),
+        ("liczba_dzieci", "2", "nieznana", 1, 0.9)))
     matka, dziecko = s.osoby
     assert dziecko.rola == Rola.DZIECKO and dziecko.aktywna("za_zyciem").zrodlo_opis == "ZAM, str. 4"
+    assert dziecko.wartosc("za_zyciem") is True              # „tak” → bool
     assert dziecko.wartosc("data_urodzenia") == "2026-07-01" and matka.wartosc("data_urodzenia") == "1994-01-01"
-    assert "data_porodu" not in matka.pola             # nieprawidłowa data – odrzucona
+    assert "data_porodu" not in matka.pola                    # nieprawidłowa data – odrzucona
+    assert matka.wartosc("liczba_dzieci") == 2                # osoba „nieznana” → właściciel pola (matka)
+
+
+def test_wybor_spoza_listy_i_przecinek_dziesietny():
+    s = _sprawa()
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="Z-3", strony=[1]), {"pola": [
+        {"pole": "umowa_rodzaj", "wartosc": "zlecona", "strona": 1, "pewnosc": 0.9},
+        {"pole": "etat", "wartosc": "0,25", "strona": 1, "pewnosc": 0.9}]})
+    assert "umowa_rodzaj" not in s.osoby[0].pola and s.osoby[0].wartosc("etat") == "0.25"
 
 
 def test_dwa_dokumenty_rozne_wartosci_to_konflikt():
     s = _sprawa()
     mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="ZAM", strony=[1]),
-                              {"data_porodu": [{"wartosc": "2026-12-20", "osoba": None, "strona": 1, "pewnosc": 0.9}]})
+                              _pola(("data_porodu", "2026-12-20", "nieznana", 1, 0.9)))
     mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="akt_urodzenia", strony=[2]),
-                              {"data_porodu": [{"wartosc": "2026-12-22", "osoba": None, "strona": 1, "pewnosc": 0.9}]})
+                              _pola(("data_porodu", "2026-12-22", "nieznana", 1, 0.9)))
     matka = s.osoby[0]
     assert matka.wartosc("data_porodu") == "2026-12-22" and merge.konflikt(matka, "data_porodu")  # urząd > wniosek
 
@@ -163,6 +177,53 @@ def test_schematy_scisle_dla_structured_outputs():
     for typ in TYPY:
         sprawdz(schemat_odczytu(typ))
     z3 = schemat_odczytu("Z-3")["properties"]
-    assert {"etat", "miesiace", "zatrudnienie_od", "platnik_ponad_20"} <= set(z3)
+    assert {"pola", "miesiace", "ezla"} == set(z3)
+    assert {"etat", "zatrudnienie_od", "platnik_ponad_20"} <= set(z3["pola"]["items"]["properties"]["pole"]["enum"])
+    assert "osoba" not in z3["pola"]["items"]["properties"]   # dokument jednej osoby
     assert "ezla" in schemat_odczytu("ZAS-53")["properties"]
     assert schemat_odczytu("inne") is None
+
+
+def test_tytul_ubezpieczenia_z_kodu_a_nie_z_kontekstu(po_odczycie):
+    """Kod 0110 → umowa o pracę, 0510 → działalność (mimo że odczyt zgadł „umowa_o_prace”)."""
+    s, _, _ = po_odczycie
+    okresy = s.osoby[0].aktywna("okresy_ubezpieczenia").wartosc
+    assert [(o["tytul"], o["do"]) for o in okresy] == [("umowa_o_prace", None), ("dzialalnosc", "2023-12-31")]
+    assert s.osoby[0].wartosc("tytuly") == ["umowa_o_prace"]   # tytuły trwających okresów
+
+
+def test_nieznany_kod_tytulu_to_inne_a_brak_kodu_zostawia_tytul_odczytu():
+    s = _sprawa()
+    mapowanie.zapisz_dokument(s, "x.pdf", Fragment(typ="zrzut_systemu_ZUS", strony=[1]), {"okresy_ubezpieczenia": [
+        {"kod_tytulu": "0999", "tytul": "umowa_o_prace", "platnik": None, "od": "2024-01-01", "do": None,
+         "chorobowe": None, "chorobowe_dobrowolne": None, "strona": 1, "pewnosc": 0.4},
+        {"kod_tytulu": None, "tytul": "zlecenie", "platnik": None, "od": "2023-01-01", "do": "2023-12-31",
+         "chorobowe": None, "chorobowe_dobrowolne": None, "strona": 1, "pewnosc": 0.9}]})
+    w = s.osoby[0].aktywna("okresy_ubezpieczenia")
+    assert [o["tytul"] for o in w.wartosc] == ["inne", "zlecenie"] and w.pewnosc == 0.4   # pewność = najniższa z wierszy
+
+
+def test_klasyfikacja_ma_opis_strony_a_prompt_zawiera_kody():
+    from app.extraction import prompts
+    from app.extraction.schema import schemat_klasyfikacji
+    assert "opis" in schemat_klasyfikacji()["properties"]["strony"]["items"]["required"]
+    assert "0110 = pracownik" in prompts.odczyt("zrzut_systemu_ZUS") and "kod_tytulu" in prompts.odczyt("poswiadczenie_ubezpieczenia")
+    from app.extraction.schema import schemat_odczytu
+    zrzut = schemat_odczytu("zrzut_systemu_ZUS")["properties"]
+    assert {"okresy_ubezpieczenia", "pola"} <= set(zrzut)
+    assert {"tytuly", "chorobowe_od"} <= set(zrzut["pola"]["items"]["properties"]["pole"]["enum"])
+
+
+def test_schematy_mieszcza_sie_w_limicie_unii_api():
+    """API odrzuca schemat z więcej niż 16 parametrami typu union (anyOf / nullable)."""
+    from app.extraction.schema import TYPY, schemat_klasyfikacji, schemat_odczytu
+
+    def unie(s):
+        if isinstance(s, dict):
+            return (1 if "anyOf" in s else 0) + sum(unie(v) for v in s.values())
+        return sum(unie(v) for v in s) if isinstance(s, list) else 0
+
+    assert unie(schemat_klasyfikacji()) <= 16
+    for typ in TYPY:
+        sch = schemat_odczytu(typ)
+        assert sch is None or unie(sch) <= 16, typ

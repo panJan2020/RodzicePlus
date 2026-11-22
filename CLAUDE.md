@@ -292,6 +292,8 @@ Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze te�
   (pola z `z_dokumentow: true` i `upload:<typ>` w `zrodla`). Każde pole ma: wartość, osobę, numer strony, pewność 0–1.
 - Dwa przebiegi: **jedno** wywołanie klasyfikacji na cały PDF + **jedno** wywołanie odczytu na dokument (tylko jego
   strony, wycięte z PDF). Podział na dokumenty robi kod (`extraction/podzial.py`). Kod: `extraction/pipeline.py`.
+- **Limity schematu API:** max 16 parametrów typu union (nullable/anyOf) i ograniczona złożoność gramatyki (liczba obiektów w tablicach). Dlatego schemat odczytu jest płaski: `pola[]` (wartość jako tekst, typ sprawdza kod w `mapowanie.py`) + osobne tablice tylko dla tabel (`miesiace`, `ezla`, `okresy_ubezpieczenia`). Zmieniając schemat, uruchom test `test_schematy_mieszcza_sie_w_limicie_unii_api` i sprawdź go na API.
+- Tytuł ubezpieczenia czytamy z **kodu tytułu** (0110, 0411, 0510, 0570 → `schema.KODY_TYTULU`), a nie z kontekstu.
 - Na razie przyjmujemy tylko PDF (inne formaty → 415). Test ręczny: `python -m scripts.odczyt_sprawy <plik.pdf>`.
 - Przebieg (zadanie w tle):
   1. **klasyfikacja stron** (ZAM, ZAS-53, ZUR, ZAO, Z-3, Z-3a, Z-3b, ZAS-12, akt urodzenia, zaświadczenie lekarskie,

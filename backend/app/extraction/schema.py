@@ -15,7 +15,8 @@ from typing import Any
 from app.domain.model import Wystawca
 from app.questions.engine import pola_z_dokumentow
 
-WERSJA = "2a-1"  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
+WERSJA = "2a-7"            # odczyt pól
+WERSJA_KLASYFIKACJI = "k2"  # klasyfikacja stron  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class TypDokumentu:
     archiwalny: bool = False       # formularz zlikwidowany od 24.10.2026 (ZUR, ZAO, Z-3b)
     rola: str = "dane"             # dane | pismo_zus | decyzja_zus
     domyslny_tytul: str | None = None  # tytuł ubezpieczenia, którego dotyczy dokument (pola „na tytuł”)
+    osoba_w_odczycie: bool = True  # False: dokument jednej osoby – osobę bierzemy z klasyfikacji strony
     etykieta_: str = ""            # krótka nazwa do „Skąd to wiemy” (domyślnie kod, np. „Z-3”)
 
     @property
@@ -41,12 +43,12 @@ TYPY: dict[str, TypDokumentu] = {t.kod: t for t in [
                  archiwalny=True),
     TypDokumentu("ZAS-53", "Wniosek o zasiłek chorobowy (ZAS-53)", Wystawca.UZYTKOWNIK, ("ZAS-53",)),
     TypDokumentu("Z-3", "Zaświadczenie płatnika składek (Z-3)", Wystawca.PRACODAWCA, ("Z-3",),
-                 domyslny_tytul="umowa_o_prace"),
+                 domyslny_tytul="umowa_o_prace", osoba_w_odczycie=False),
     TypDokumentu("Z-3a", "Zaświadczenie płatnika składek (Z-3a)", Wystawca.PRACODAWCA, ("Z-3a",),
-                 domyslny_tytul="zlecenie"),
+                 domyslny_tytul="zlecenie", osoba_w_odczycie=False),
     TypDokumentu("Z-3b", "Zaświadczenie płatnika składek (Z-3b)", Wystawca.PRACODAWCA, ("Z-3b",), archiwalny=True,
-                 domyslny_tytul="dzialalnosc"),
-    TypDokumentu("ZAS-12", "Zaświadczenie płatnika – dalszy okres (ZAS-12)", Wystawca.PRACODAWCA, ("ZAS-12",)),
+                 domyslny_tytul="dzialalnosc", osoba_w_odczycie=False),
+    TypDokumentu("ZAS-12", "Zaświadczenie płatnika – dalszy okres (ZAS-12)", Wystawca.PRACODAWCA, ("ZAS-12",), osoba_w_odczycie=False),
     TypDokumentu("akt_urodzenia", "Akt urodzenia", Wystawca.URZAD, ("akt",), etykieta_="Akt urodzenia"),
     TypDokumentu("zaswiadczenie_lekarskie", "Zaświadczenie lekarskie", Wystawca.LEKARZ, ("zaswiadczenie_lek",),
                  etykieta_="Zaświadczenie lekarskie"),
@@ -54,8 +56,10 @@ TYPY: dict[str, TypDokumentu] = {t.kod: t for t in [
                  etykieta_="Zaświadczenie „Za życiem”"),
     TypDokumentu("wniosek_urlop", "Wniosek o urlop", Wystawca.UZYTKOWNIK, etykieta_="Wniosek o urlop"),
     TypDokumentu("poswiadczenie_ubezpieczenia", "Poświadczenie ubezpieczenia (ZUS)", Wystawca.ZUS,
-                 ("poswiadczenie",), etykieta_="Poświadczenie ZUS"),
-    TypDokumentu("zrzut_systemu_ZUS", "Zrzut z systemu ZUS", Wystawca.ZUS, ("zrzut_zus",), etykieta_="Zrzut z systemu ZUS"),
+                 ("poswiadczenie",), osoba_w_odczycie=False,
+                 etykieta_="Poświadczenie ZUS"),
+    TypDokumentu("zrzut_systemu_ZUS", "Zrzut z systemu ZUS", Wystawca.ZUS, ("zrzut_zus",), osoba_w_odczycie=False,
+                 etykieta_="Zrzut z systemu ZUS"),
     TypDokumentu("pismo_ZUS", "Pismo z ZUS", Wystawca.ZUS, rola="pismo_zus", etykieta_="Pismo ZUS"),
     TypDokumentu("decyzja_ZUS", "Decyzja / wynik sprawy w ZUS", Wystawca.ZUS, rola="decyzja_zus", etykieta_="Decyzja ZUS"),
     TypDokumentu("inne", "Inny dokument", Wystawca.UZYTKOWNIK, etykieta_="Inny dokument"),
@@ -77,7 +81,12 @@ OPIS_TYPOW = """- ZAM – wniosek o zasiłek macierzyński (od 24.10.2026),
 - inne – wszystko inne (koperta, pusta strona, nieczytelna strona)."""
 
 OSOBY = ["matka", "ojciec", "dziecko"]
+NIEZNANA, NIEZNANY = "nieznana", "nieznany"  # zamiast null w schematach odczytu pól
 TYTULY = ["umowa_o_prace", "zlecenie", "dzialalnosc", "wspolpraca", "dzielo", "inne"]
+# Kody tytułu ubezpieczenia (4 cyfry, widoczne na poświadczeniu i zrzucie z systemu ZUS) → tytuł w aplikacji.
+# Tylko kody podane przez zespół; inny kod zostaje jako `kod_tytulu` i daje tytuł „inne” (do sprawdzenia).
+# Zweryfikuj z mentorami ZUS przed wdrożeniem (docs/pytania_kalkulator.md, sekcja Z).
+KODY_TYTULU = {"0110": "umowa_o_prace", "0411": "zlecenie", "0510": "dzialalnosc", "0570": "dzialalnosc"}
 POLA_NA_TYTUL = {"chorobowe", "platnik_ponad_20"}  # wartość-słownik {tytul: wartość} (docs/architektura.md, rozdz. 4)
 
 
@@ -111,47 +120,56 @@ def schemat_klasyfikacji() -> dict[str, Any]:
                                 "description": "strona zaczyna nowy egzemplarz dokumentu (nagłówek, tytuł formularza)"},
         "osoba": _null(_enum(OSOBY)),
         "obrocona": {"type": "boolean"},
+        "opis": {"type": "string", "description": "kilka słów: czym jest ta strona"},
     })}})
 
 
 # ---------- przebieg 2: odczyt pól dokumentu ----------
+# Gramatyka structured outputs ma limit złożoności (liczby obiektów w tablicach), więc schemat jest płaski:
+#   * `pola` – jedna lista wpisów {pole, wartosc (tekst), osoba, tytul, strona, pewnosc} dla wszystkich pól skalarnych,
+#   * osobne tablice tylko dla tabel (`miesiace`, `ezla`, `okresy_ubezpieczenia`) – wiersz ma własną stronę i pewność.
+# Typ wartości (data, liczba, tak/nie, wybór) waliduje kod w `mapowanie.py`.
 
-_ELEMENTY: dict[str, dict[str, Any]] = {
+def _wiersz(props: dict[str, Any]) -> dict[str, Any]:
+    return _obj({**props, "strona": {"type": "integer"}, "pewnosc": {"type": "number", "description": "0–1"}})
+
+
+_TABELE: dict[str, dict[str, Any]] = {
     # D1 – zwolnienia lekarskie; `kod` tylko, gdy widoczny na dokumencie.
-    "ezla": _obj({"od": _DATA, "do": _DATA,
-                  "kod": _null({"type": "string", "description": "litera kodu niezdolności, tylko jeśli widoczna"})}),
+    "ezla": _wiersz({"od": _DATA, "do": _DATA,
+                     "kod": _null({"type": "string", "description": "litera kodu niezdolności, tylko jeśli widoczna"})}),
     # B5a – okresy ubezpieczenia (zrzut systemu / poświadczenie ZUS)
-    "okresy_ubezpieczenia": _obj({
+    "okresy_ubezpieczenia": _wiersz({
+        "kod_tytulu": _null({"type": "string", "description": "4-cyfrowy kod tytułu ubezpieczenia, np. 0110"}),
         "tytul": _enum(TYTULY), "platnik": _null({"type": "string"}),
         "od": _DATA, "do": _null(_DATA), "chorobowe": _null({"type": "boolean"}),
         "chorobowe_dobrowolne": _null({"type": "boolean"})}),
-    # O4 – Z-3, „Składniki wynagrodzenia”
-    "miesiace": _obj({
+    # O4 – Z-3, „Składniki wynagrodzenia”; 0 = nie ma w dokumencie
+    "miesiace": _wiersz({
         "miesiac": {"type": "string", "description": "RRRR-MM"},
         "skladniki_stale": {"type": "number", "description": "składniki stałe brutto w kwocie wypłaconej"},
-        "skladniki_zmienne": _null({"type": "number"}),
-        "dni_przepracowane": _null({"type": "integer"}),
-        "dni_obowiazujace": _null({"type": "integer", "description": "dni, które trzeba było przepracować"}),
-        "stale_pelna_kwota": _null({"type": "number", "description": "pełna miesięczna kwota składników stałych"})}),
+        "skladniki_zmienne": {"type": "number", "description": "składniki zmienne brutto; 0 gdy brak"},
+        "dni_przepracowane": {"type": "integer", "description": "0 gdy brak"},
+        "dni_obowiazujace": {"type": "integer", "description": "dni, które trzeba było przepracować; 0 gdy brak"},
+        "stale_pelna_kwota": {"type": "number",
+                              "description": "pełna miesięczna kwota składników stałych z umowy; 0 gdy brak"}}),
 }
 
 
-def _schemat_wartosci(p: dict[str, Any]) -> dict[str, Any]:
-    if p["pole"] in _ELEMENTY:
-        return {"type": "array", "items": _ELEMENTY[p["pole"]]}
-    opcje = [o["wartosc"] if isinstance(o, dict) else o for o in p.get("opcje") or []]
-    typ = p["typ"]
-    if typ == "data":
-        return _DATA
-    if typ == "liczba":
-        return {"type": "number"}
-    if typ == "tak_nie":
-        return {"type": "boolean"}
+def opcje_pola(p: dict[str, Any]) -> list[str]:
+    return [o["wartosc"] if isinstance(o, dict) else o for o in p.get("opcje") or []]
+
+
+def _opis_pola(p: dict[str, Any]) -> str:
+    typ, opcje = p["typ"], opcje_pola(p)
     if typ == "wybor" and opcje:
-        return _enum(opcje)
-    if typ == "wielokrotny" and opcje:
-        return {"type": "array", "items": _enum(opcje)}
-    return {"type": "string"}
+        fmt = "jedna z: " + ", ".join(opcje)
+    elif typ == "wielokrotny" and opcje:
+        fmt = "wartości z listy, oddzielone przecinkami: " + ", ".join(opcje)
+    else:
+        fmt = {"data": "data RRRR-MM-DD", "liczba": "liczba z kropką dziesiętną, np. 0.25",
+               "tak_nie": "„tak” albo „nie”"}.get(typ, "tekst")
+    return f"- {p['pole']}: {p['tresc']} [{fmt}]"
 
 
 def pola_typu(typ: str) -> list[dict[str, Any]]:
@@ -174,11 +192,20 @@ def schemat_odczytu(typ: str) -> dict[str, Any] | None:
     pola = pola_typu(typ)
     if not pola:
         return None
-    props = {}
+    props: dict[str, Any] = {}
+    skalary = [p for p in pola if p["pole"] not in _TABELE]
+    if skalary:
+        wpis: dict[str, Any] = {"pole": {"type": "string", "enum": [p["pole"] for p in skalary]},
+                                "wartosc": {"type": "string", "description": "wartość zapisana tekstem, w podanym formacie"}}
+        if t.osoba_w_odczycie:
+            wpis["osoba"] = _enum(OSOBY + [NIEZNANA])
+        if any(p["pole"] in POLA_NA_TYTUL for p in skalary) and not t.domyslny_tytul:
+            wpis["tytul"] = _enum(TYTULY + [NIEZNANY])   # tylko dla pól na tytuł (chorobowe, platnik_ponad_20)
+        wpis |= {"strona": {"type": "integer"}, "pewnosc": {"type": "number", "description": "0–1"}}
+        props["pola"] = {"type": "array", "items": _obj(wpis),
+                         "description": "Każde widoczne pole jako osobny wpis. Pola:" + "\n" +
+                                        "\n".join(_opis_pola(p) for p in skalary)}
     for p in pola:
-        wpis = {"wartosc": _schemat_wartosci(p), "osoba": _null(_enum(OSOBY)),
-                "strona": {"type": "integer"}, "pewnosc": {"type": "number", "description": "0–1"}}
-        if p["pole"] in POLA_NA_TYTUL:
-            wpis["tytul"] = _null(_enum(TYTULY))
-        props[p["pole"]] = {"type": "array", "description": p["tresc"], "items": _obj(wpis)}
+        if p["pole"] in _TABELE:
+            props[p["pole"]] = {"type": "array", "items": _TABELE[p["pole"]], "description": p["tresc"]}
     return _obj(props)

@@ -13,7 +13,7 @@ from typing import Any
 from app import merge
 from app.domain.model import Dokument, Kanal, Osoba, Rola, Sprawa, WartoscPola
 from app.extraction.podzial import Fragment
-from app.extraction.schema import POLA_NA_TYTUL, TYPY
+from app.extraction.schema import KODY_TYTULU, NIEZNANA, NIEZNANY, POLA_NA_TYTUL, TYPY, opcje_pola
 from app.merge.scalanie import prog_pewnosci
 from app.questions import engine
 
@@ -67,14 +67,17 @@ def miesiac_pola(m: dict[str, Any]) -> dict[str, Any]:
             "skladniki_zmienne": _kwota(m.get("skladniki_zmienne") or 0),
             "dni_przepracowane": int(m.get("dni_przepracowane") or 0),
             "dni_obowiazujace": int(m.get("dni_obowiazujace") or 0),
-            "stale_pelna_kwota": _kwota(m.get("stale_pelna_kwota"))}
+            "stale_pelna_kwota": _kwota(m.get("stale_pelna_kwota")) if m.get("stale_pelna_kwota") else None}
 
 
 def _okres_ubezpieczenia(o: dict[str, Any]) -> dict[str, Any] | None:
     od = _data(o.get("od"))
     if od is None:
         return None
-    return {"tytul": o["tytul"], "platnik": o.get("platnik") or "", "platnik_ponad_20": None, "od": od,
+    kod = (o.get("kod_tytulu") or "").strip()
+    # Tytuł z KODU (deterministycznie); kod nieznany → „inne”; brak kodu → tytuł podany przez odczyt.
+    tytul = KODY_TYTULU.get(kod, "inne") if kod else o["tytul"]
+    return {"tytul": tytul, "platnik": o.get("platnik") or "", "platnik_ponad_20": None, "od": od,
             "do": _data(o.get("do")), "chorobowe": o.get("chorobowe"),
             "chorobowe_dobrowolne": bool(o.get("chorobowe_dobrowolne"))}
 
@@ -86,29 +89,63 @@ def _ezla(o: dict[str, Any]) -> dict[str, Any] | None:
     return {"od": od, "do": do, "kod": o.get("kod") or None}  # kod tylko, jeśli był widoczny – nie zgadujemy
 
 
+def _okresy_wpisu(w: dict[str, Any]) -> list[dict[str, Any]]:
+    return [e for e in (_okres_ubezpieczenia(x) for x in w.get("wartosc") or []) if e is not None]
+
+
 _LISTY = {"miesiace": miesiac_pola, "okresy_ubezpieczenia": _okres_ubezpieczenia, "ezla": _ezla}
 
 
-def _wartosc(pole: str, typ_pola: str, v: Any) -> Any:
-    """Wartość z odczytu → kształt pola w modelu (jak w adapterach źródeł). None = odrzucamy."""
-    if v is None:
+def _tak_nie(v: Any) -> bool | None:
+    if isinstance(v, bool):
+        return v
+    return {"tak": True, "true": True, "nie": False, "false": False}.get(str(v).strip().lower())
+
+
+def _wartosc(q: dict[str, Any], v: Any) -> Any:
+    """Wartość z odczytu (tekst od Claude) → kształt pola w modelu (jak w adapterach źródeł).
+    Walidujemy typ w kodzie; wartość niezgodna z typem pola → None (odrzucamy)."""
+    pole, typ_pola = q["pole"], q["typ"]
+    if v is None or v == "":
         return None
     if pole in _LISTY:
         elementy = [e for e in (_LISTY[pole](x) for x in v or []) if e is not None]
         return elementy or None
     if typ_pola == "data":
         return _data(v)
+    if typ_pola == "tak_nie":
+        return _tak_nie(v)
     if typ_pola == "liczba":
         try:
-            d = Decimal(str(v))
+            d = Decimal(str(v).replace(",", ".").strip())
         except InvalidOperation:
             return None
         if pole in POLA_DZIESIETNE:
             return str(d.quantize(Decimal("0.01")))
         return int(d) if d == d.to_integral_value() else str(d)
+    opcje = opcje_pola(q)
+    if typ_pola == "wybor":
+        return v if not opcje or v in opcje else None
     if typ_pola == "wielokrotny":
-        return list(v) or None
+        lista = v if isinstance(v, list) else [x.strip() for x in str(v).split(",") if x.strip()]
+        lista = [x for x in lista if not opcje or x in opcje]
+        return lista or None
     return v
+
+
+def rozpakuj(odczyt: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Odpowiedź Claude (`pola[]` + tabele) → {pole: [wpis]} z wpisem {wartosc, osoba, tytul, strona, pewnosc}.
+    Wiersze tabeli łączymy w jedną wartość pola (strona pierwszego wiersza, pewność najniższa)."""
+    wynik: dict[str, list[dict[str, Any]]] = {}
+    for w in odczyt.get("pola") or []:
+        wynik.setdefault(w["pole"], []).append(w)
+    for pole in _LISTY:
+        wiersze = odczyt.get(pole) or []
+        if wiersze:
+            czyste = [{k: v for k, v in x.items() if k not in ("strona", "pewnosc")} for x in wiersze]
+            wynik[pole] = [{"wartosc": czyste, "strona": wiersze[0].get("strona"),
+                            "pewnosc": min(float(x.get("pewnosc") or 0) for x in wiersze)}]
+    return wynik
 
 
 # ---------- zapis dokumentu ----------
@@ -118,7 +155,7 @@ def _wpisy_na_osobe(wpisy: list[dict[str, Any]], lista: bool) -> dict[str | None
     najpewniejszą."""
     wynik: dict[str | None, dict[str, Any]] = {}
     for w in wpisy:
-        klucz = w.get("osoba")
+        klucz = None if w.get("osoba") == NIEZNANA else w.get("osoba")
         if klucz not in wynik:
             wynik[klucz] = dict(w)
         elif lista:
@@ -152,16 +189,22 @@ def zapisz_dokument(s: Sprawa, plik: str, frag: Fragment, odczyt: dict[str, Any]
         return dok
 
     prog = prog_pewnosci()
+    # Tytuły trwających okresów z KODU tytułu mają pierwszeństwo przed „tytuly” zgadniętym przez odczyt.
+    odczyt = rozpakuj(odczyt)
+    okresy = [e for w in odczyt.get("okresy_ubezpieczenia") or [] for e in _okresy_wpisu(w)]
+    trwajace = list(dict.fromkeys(e["tytul"] for e in okresy if e["do"] is None))
+    if trwajace and odczyt.get("tytuly"):
+        odczyt = {**odczyt, "tytuly": [{**w, "wartosc": trwajace} for w in odczyt["tytuly"]]}
     for pole, wpisy in odczyt.items():
         q = engine.pytanie_dla_pola(pole)
         if q is None or not wpisy:
             continue
         for rola, w in _wpisy_na_osobe(wpisy, pole in _LISTY).items():
-            v = _wartosc(pole, q["typ"], w.get("wartosc"))
+            v = _wartosc(q, w.get("wartosc"))
             if v is None:
                 continue
             if pole in POLA_NA_TYTUL:
-                tytul = w.get("tytul") or t.domyslny_tytul
+                tytul = (None if w.get("tytul") == NIEZNANY else w.get("tytul")) or t.domyslny_tytul
                 if not tytul:
                     continue
                 v = {tytul: v}

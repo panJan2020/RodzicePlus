@@ -98,13 +98,13 @@ def test_upload_dokumentow_zadanie_lista_i_usuwanie(monkeypatch):
     r = c.post(f"/sprawy/{sid}/dokumenty", files=[("pliki", ("sprawa.pdf", pdf, "application/pdf"))])
     assert r.status_code == 202
     z = c.get(f"/zadania/{r.json()['zadanie_id']}").json()  # TestClient wykonuje zadanie w tle od razu
-    assert z["status"] == "gotowe" and z["postep"] == 1.0 and len(z["dokumenty"]) == 8
+    assert z["status"] == "gotowe" and z["postep"] == 1.0 and len(z["dokumenty"]) == 9
     assert z["zmiana_danych"]["dodano"] > 0 and all("tokeny_wejscie" in w for w in z["wywolania"])
 
     dok = c.get(f"/sprawy/{sid}/dokumenty").json()
     assert [d["typ"] for d in dok].count("Z-3") == 4 and dok[0]["typ_opis"].startswith("Wniosek")
     assert c.get(f"/sprawy/{sid}").json()["ma_decyzje_zus"] is True
 
-    r = c.delete(f"/sprawy/{sid}/dokumenty/{dok[-2]['id']}")  # zrzut ZUS
+    r = c.delete(f"/sprawy/{sid}/dokumenty/{dok[6]['id']}")  # zrzut ZUS
     assert r.status_code == 200 and "okresy_ubezpieczenia" in r.json()["zmieniono_aktywne"]
     assert c.delete(f"/sprawy/{sid}/dokumenty/d999").status_code == 404

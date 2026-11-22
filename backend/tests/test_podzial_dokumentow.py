@@ -16,7 +16,7 @@ def _s(n, typ, x=None, y=None, wariant=None, poczatek=False, osoba=None):
 def test_sprawa_przykladowa_zas53_pismo_4x_z3_zrzut_decyzja():
     fr = podziel(FIKSTURA["klasyfikacja"]["strony"])
     assert [f.typ for f in fr] == ["ZAS-53", "pismo_ZUS", "Z-3", "Z-3", "Z-3", "Z-3", "zrzut_systemu_ZUS",
-                                   "decyzja_ZUS"]
+                                   "decyzja_ZUS", "inne"]
     z3 = [f for f in fr if f.typ == "Z-3"]
     assert [f.strony for f in z3] == [[4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [16, 17, 18, 19]]
     assert [f.wariant for f in z3] == ["pierwszorazowy", "w_kontynuacji", "w_kontynuacji", "w_kontynuacji"]
