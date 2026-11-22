@@ -44,24 +44,74 @@ class SzkieletStrony extends StatelessWidget {
       appBar: _Naglowek(kompaktowy: false),
       body: Row(
         children: [
-          NavigationRail(
-            extended: uklad == Uklad.komputer,
-            minExtendedWidth: 220,
-            selectedIndex: wybrany,
-            onDestinationSelected: idz,
-            labelType: uklad == Uklad.komputer ? NavigationRailLabelType.none : NavigationRailLabelType.all,
-            destinations: [
-              for (final p in pozycjeMenu)
-                NavigationRailDestination(
-                  icon: Icon(p.ikona),
-                  selectedIcon: Icon(p.ikonaAktywna),
-                  label: Text(p.etykieta),
-                ),
-            ],
-          ),
+          _MenuBoczne(rozwiniete: uklad == Uklad.komputer, wybrany: wybrany, onWybor: idz),
           const VerticalDivider(width: 1),
           Expanded(child: child),
         ],
+      ),
+    );
+  }
+}
+
+/// Boczne menu tabletu/komputera. Cała pozycja (nie tylko ikona) podświetla się
+/// po najechaniu i po wybraniu.
+class _MenuBoczne extends StatelessWidget {
+  const _MenuBoczne({required this.rozwiniete, required this.wybrany, required this.onWybor});
+
+  final bool rozwiniete;
+  final int wybrany;
+  final ValueChanged<int> onWybor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Kolory.powierzchnia,
+      child: SizedBox(
+        width: rozwiniete ? 240 : 96,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          children: [
+            for (var i = 0; i < pozycjeMenu.length; i++) _pozycja(i),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pozycja(int i) {
+    final p = pozycjeMenu[i];
+    final aktywna = i == wybrany;
+    final kolor = aktywna ? Kolory.primaryDark : Kolory.tekstDrugorzedny;
+    final styl = TextStyle(color: kolor, fontSize: rozwiniete ? 15 : 12, fontWeight: aktywna ? FontWeight.w600 : null);
+    final ikona = Icon(aktywna ? p.ikonaAktywna : p.ikona, color: kolor);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Semantics(
+        button: true,
+        selected: aktywna,
+        label: p.etykieta,
+        excludeSemantics: true,
+        child: Material(
+          color: aktywna ? Kolory.primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onWybor(i),
+            hoverColor: Kolory.primaryLight,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: rozwiniete ? 10 : 8),
+                child: rozwiniete
+                    ? Row(children: [ikona, const SizedBox(width: 12), Expanded(child: Text(p.etykieta, style: styl))])
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [ikona, const SizedBox(height: 4), Text(p.etykieta, style: styl, textAlign: TextAlign.center)],
+                      ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -113,9 +163,11 @@ class _Naglowek extends StatelessWidget implements PreferredSizeWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.family_restroom, color: Kolory.primary, semanticLabel: 'Strona główna'),
-              const SizedBox(width: 8),
-              Flexible(child: Text(Config.nazwaAplikacji, overflow: TextOverflow.ellipsis)),
+              Image.asset('assets/logo.png', height: 40, semanticLabel: 'Rodzina Plus – strona główna'),
+              if (!kompaktowy) ...[
+                const SizedBox(width: 12),
+                Flexible(child: Text(Config.nazwaAplikacji, overflow: TextOverflow.ellipsis)),
+              ],
             ],
           ),
         ),
