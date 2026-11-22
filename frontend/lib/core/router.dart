@@ -1,5 +1,7 @@
 import 'package:go_router/go_router.dart';
 
+import '../features/dane/dane_view.dart';
+import '../features/kalkulator/kalkulator_view.dart';
 import '../features/konto/konto_view.dart';
 import '../features/logowanie/logowanie_view.dart';
 import '../features/start/start_view.dart';
@@ -8,7 +10,7 @@ import '../shared/widgets/szkielet_strony.dart';
 import 'session.dart';
 
 /// Ekrany dostępne tylko po zalogowaniu.
-const _chronione = {'/konto', '/ubezpieczenie'};
+const _chronione = {'/konto', '/ubezpieczenie'}; // „Dane” i „Kalkulator” działają też bez logowania
 
 /// Trasy aplikacji. Router nasłuchuje sesji:
 /// * niezalogowany na chronionym ekranie → `/logowanie?z=<skąd przyszedł>`,
@@ -34,6 +36,9 @@ GoRouter utworzRouter(SesjaAplikacji sesja) => GoRouter(
             GoRoute(path: '/logowanie', builder: (_, _) => const LogowanieView()),
             GoRoute(path: '/konto', builder: (_, _) => const KontoView()),
             GoRoute(path: '/ubezpieczenie', builder: (_, _) => const UbezpieczenieView()),
+            // /dane?pytanie=B5 – rozwija sekcję i przewija do pytania
+            GoRoute(path: '/dane', builder: (_, s) => DaneView(pytanie: s.uri.queryParameters['pytanie'])),
+            GoRoute(path: '/kalkulator', builder: (_, _) => const KalkulatorView()),
           ],
         ),
       ],

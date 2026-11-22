@@ -43,6 +43,8 @@ class PozycjaMenu {
 const pozycjeMenu = <PozycjaMenu>[
   PozycjaMenu('Start', Icons.home_outlined, Icons.home, '/'),
   PozycjaMenu('Ubezpieczenie', Icons.health_and_safety_outlined, Icons.health_and_safety, '/ubezpieczenie'),
+  PozycjaMenu('Moje dane', Icons.fact_check_outlined, Icons.fact_check, '/dane'),
+  PozycjaMenu('Kalkulator', Icons.calculate_outlined, Icons.calculate, '/kalkulator'),
   PozycjaMenu('Moje konto', Icons.person_outline, Icons.person, '/konto'),
 ];
 

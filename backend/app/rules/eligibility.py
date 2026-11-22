@@ -2,11 +2,17 @@
 
 Zasada: każda funkcja dotyczy jednego świadczenia, nie rzuca wyjątków przy brakach,
 tylko zwraca BRAK_DANYCH z listą pól do uzupełnienia (checklista w UI).
+
+Funkcja reguły:
+  * dostaje osobę z samymi AKTYWNYMI polami (bez odpowiedzi na pytania wykluczone),
+  * do `brakujace_pola` wpisuje NAZWY pól (np. "tytuly") – tak łatwiej pisać reguły,
+  * `ocen_wszystko` zamienia je na ID pytań (np. "B1") i dopisuje treść pytań dla UI.
 """
 from typing import Any, Callable
 
 from app.domain.profile import Osoba
-from app.domain.results import Status, WynikUprawnienia
+from app.domain.results import BrakujacePytanie, Status, WynikUprawnienia
+from app.questions import engine
 
 
 def _kto_wyplaca(o: Osoba) -> str:
@@ -58,5 +64,18 @@ REGULY: dict[str, Callable[[Osoba, dict[str, Any]], WynikUprawnienia]] = {
 }
 
 
-def ocen_wszystko(o: Osoba, p: dict[str, Any]) -> list[WynikUprawnienia]:
-    return [regula(o, p) for regula in REGULY.values()]
+def _brakujace_jako_pytania(w: WynikUprawnienia, osoba: Osoba) -> WynikUprawnienia:
+    """Nazwy pól → ID pytań, na które da się odpowiedzieć teraz (zablokowane → pytanie nadrzędne)."""
+    w.brakujace_pola = engine.pytania_do_uzupelnienia(osoba, w.brakujace_pola)
+    w.brakujace_pytania = []
+    for id_ in w.brakujace_pola:
+        q = engine.pytanie(id_)
+        if q:
+            w.brakujace_pytania.append(BrakujacePytanie(id=id_, tresc=q["tresc"], gdzie_znalezc=q.get("gdzie_znalezc")))
+    return w
+
+
+def ocen_wszystko(osoba: Osoba, p: dict[str, Any]) -> list[WynikUprawnienia]:
+    """Ocenia wszystkie świadczenia z rejestru. `osoba` = pełny profil (z wartościami wykluczonymi)."""
+    aktywna = engine.aktywne_pola(osoba)
+    return [_brakujace_jako_pytania(regula(aktywna, p), osoba) for regula in REGULY.values()]

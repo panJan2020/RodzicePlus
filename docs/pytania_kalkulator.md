@@ -1,250 +1,353 @@
-# Zasiłkowy Przewodnik – pełna lista pytań do ustalenia prawa i wyliczenia świadczeń
+# Słownik pól i katalog pytań – ustalanie prawa i wyliczanie świadczeń
 
-Lista na podstawie: treści wyzwania, ustawy zasiłkowej (wyciąg), Kodeksu pracy (wyciąg), rozporządzenia z 27.09.2026 r. w sprawie zakresu informacji i dokumentów (zwł. załączniki 2, 3, 6, 7), rozporządzenia w sprawie wniosków o urlopy, Poradnika ZUS 2026 oraz załącznika ZUS (wymiary, wysokości, podstawa wymiaru).
+> **Jedyne źródło nazw pól** w projekcie. Z tego pliku powstaje `backend/app/questions/katalog.json`, schematy odczytu
+> dokumentów (Claude API), wymagania reguł w `rules/` i parametry w `params/`.
+> Model danych: `docs/architektura.md` (rozdz. 3). Funkcje i ekrany: `docs/opis_aplikacji.md`.
 
-## Jak czytać
+Podstawa: treść wyzwania, ustawa zasiłkowa (wyciąg), Kodeks pracy (wyciąg), rozporządzenie z 27.09.2026 r. w sprawie
+zakresu informacji i dokumentów (zwł. załączniki 2, 3, 6, 7), rozporządzenie w sprawie wniosków o urlopy, Poradnik ZUS 2026,
+załącznik ZUS (wymiary, wysokości, podstawa wymiaru).
 
-- **ID** – identyfikator pytania (do kodu, testów i dokumentacji).
-- **Pole** – proponowana nazwa pola we wspólnym schemacie danych (ten sam schemat dla kwestionariusza i odczytu skanów).
-- **Pokaż, gdy** – warunek wyświetlenia pytania. Pytań nie zadajemy wszystkich naraz, tylko po kolei według odpowiedzi.
-- **Źródło odpowiedzi:** 👤 użytkownik · 🏛 dane ZUS (symulacja: PUE/eZUS, e-ZLA, konto płatnika) · 📄 dokumenty ze sprawy (ZAM, Z-3, Z-3a, Z-3b, ZAS-53, ZAS-12, akt urodzenia, zaświadczenia).
-- Jeśli w sprawie są **dwie osoby** (matka i ojciec), sekcje B, C oraz O–R wypełnia się osobno dla każdej z nich.
-- „Dziecko” oznacza każde dziecko z jednego porodu albo przyjęte jednocześnie. Pola dziecka są listą.
+---
+
+## 0. Jak czytać
+
+| Kolumna | Znaczenie |
+|---|---|
+| **ID** | identyfikator pytania (kod, testy, dokumentacja). Pytanie z kilkoma polami ma pod-ID (`B3` + `B3a`); tryb uproszczony ma przyrostek `s` (`O4s`). |
+| **Pole** | nazwa pola w `Osoba.pola` – **ta sama** w kreatorze, odczycie skanów, regułach i API |
+| **Osoba** | czyje to pole: `rodzic` (osobno dla matki i ojca / drugiego rodzica), `dziecko` (osobno dla każdego dziecka), `wnioskodawca` (osoba, która wnioskuje o dane świadczenie) |
+| **Rodzaj** | `fakt` – stan rzeczy, może mieć wiele wartości z różnych źródeł · `plan` – zamiar, **tylko** od użytkownika · `wybór` – decyzja do symulacji, trafia do **scenariusza** (`Scenariusz.wybory`), nie do pól osoby · `wyliczone` – liczy system, użytkownik nie odpowiada |
+| **Pokaż, gdy** | warunek wyświetlenia. Niespełniony → pytanie `wykluczone` (wartość zostaje, reguły jej nie używają); czeka na odpowiedź nadrzędną → `zablokowane` |
+| **Źródła** | kody źródeł (kanałów), z których może przyjść wartość – patrz niżej |
+
+### Kody źródeł
+
+| Kod | Wystawca | Kanał | Uwagi |
+|---|---|---|---|
+| `mobywatel` | urząd | mObywatel / PESEL | symulacja |
+| `rsc` | urząd | rejestr stanu cywilnego | symulacja |
+| `zus_konto` | ZUS | konto ubezpieczonego (zgłoszenia, RCA) | symulacja; w sprawach testowych także strony „poświadczenie ubezpieczenia” i „zrzut systemu ZUS” |
+| `zus_platnik` | ZUS | dane płatnika | symulacja |
+| `zus_historia` | ZUS | historia świadczeń | symulacja; w sprawach testowych także zrzuty systemu |
+| `ezla` | lekarz | e-ZLA | symulacja |
+| `pue` | ZUS | PUE / eZUS | symulacja |
+| `upload:<typ>` | wg typu dokumentu | upload | np. `upload:Z-3` (wystawca `pracodawca`), `upload:akt` (`urzad`), `upload:zaswiadczenie_lek` (`lekarz`), `upload:postanowienie` (`sad`) |
+| `kreator` | użytkownik | kreator / Moje dane | zawsze możliwe dla pól `fakt` i `plan` |
+| `wyliczone` | system | – | pola `wyliczone` |
+
+**Hierarchia przy konflikcie** (domyślna aktywna wartość): `zus` / `urzad` > `sad` > `pracodawca` / `lekarz` >
+odczyt AI z pewnością < 0,6 > `uzytkownik`. Pola `plan` – tylko `kreator`.
+
+**Kreator nie pyta o pole, które ma już aktywną wartość** z innego źródła.
 
 ---
 
 ## A. Sytuacja i rola (zawsze)
 
-| ID | Pytanie (odpowiedzi) | Pole | Pokaż, gdy | Po co (reguła / przepis) | Źródło |
-|---|---|---|---|---|---|
-| A1 | Jaka jest Twoja sytuacja? (wielokrotny wybór: planuję dziecko / jestem w ciąży / dziecko się urodziło / dziecko urodziło się martwe lub zmarło / przyjąłem(-am) dziecko na wychowanie / muszę opiekować się dzieckiem lub chorym członkiem rodziny) | `sytuacja[]` | zawsze | wybór ścieżek pytań | 👤 📄 |
-| A2 | Kim jesteś dla dziecka? (matka / ojciec / inny członek najbliższej rodziny / osoba, która przyjęła dziecko i złożyła wniosek o przysposobienie / rodzina zastępcza) | `rola` | zawsze | uprawnienia zależą od roli (art. 29 ust. 1–10 u.z.) | 👤 📄 ZAM |
-| A3 | Czy drugi rodzic też będzie korzystał z urlopów lub zasiłków? (tak / nie / nie wiem) | `drugi_rodzic_aktywny` | A1 ≠ tylko opieka | uruchamia drugi profil i symulację podziału (wym. d) | 👤 |
-| A4 | Data urodzenia wnioskodawcy | `data_urodzenia` | zawsze | wynagrodzenie chorobowe 33 albo 14 dni (art. 92 KP) | 🏛 📄 |
+| ID | Pytanie (odpowiedzi) | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co (reguła / przepis) | Źródła |
+|---|---|---|---|---|---|---|---|
+| A1 | Jaka jest Twoja sytuacja? (wielokrotny: planuję dziecko / jestem w ciąży / dziecko się urodziło / dziecko urodziło się martwe lub zmarło / przyjąłem(-am) dziecko na wychowanie / opiekuję się dzieckiem lub chorym członkiem rodziny) | `sytuacja[]` | wnioskodawca | fakt | zawsze | wybór ścieżek pytań; `Sprawa.zdarzenie` | kreator, upload:ZAM |
+| A2 | Kim jesteś dla dziecka? (matka / ojciec / inny członek najbliższej rodziny / osoba, która przyjęła dziecko i złożyła wniosek o przysposobienie / rodzina zastępcza) | `rola` | rodzic | fakt | zawsze | uprawnienia zależą od roli (art. 29 ust. 1–10 u.z.); = `Osoba.rola` | kreator, upload:ZAM, rsc |
+| A3 | Czy drugi rodzic też będzie korzystał z urlopów lub zasiłków? (tak / nie / nie wiem) | `drugi_rodzic_aktywny` | wnioskodawca | plan | A1 ≠ tylko opieka | „tak” → dodanie osoby `ojciec` / `drugi_rodzic` i symulacja podziału (wym. d) | kreator |
+| A4 | Data urodzenia | `data_urodzenia` | rodzic, dziecko | fakt | zawsze | wynagrodzenie chorobowe 33 albo 14 dni (art. 92 KP); u dziecka – limity wieku | mobywatel, rsc, upload:akt, upload:ZAM, kreator |
 
-## B. Tytuł ubezpieczenia i ubezpieczenie chorobowe (dla każdej osoby)
+## B. Tytuł ubezpieczenia i ubezpieczenie chorobowe
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| B1 | Na jakiej podstawie pracujesz? (wielokrotny: umowa o pracę / umowa zlecenia lub agencyjna / działalność gospodarcza / współpraca przy działalności / umowa o dzieło / inne / nie pracuję) | `tytuly[]` | zawsze | urlop (tylko pracownik) albo zasiłek „za okres odpowiadający urlopowi”; kto wypłaca; sposób liczenia podstawy | 🏛 📄 |
-| B2 | Wymiar etatu | `etat` | B1 ∋ umowa o pracę | minimalna podstawa przy pełnym etacie (art. 45); łączenie z urlopem rodzicielskim | 🏛 📄 Z-3 |
-| B3 | Rodzaj umowy o pracę i data jej końca (nieokreślony / określony / próbny ponad 1 mies. / na zastępstwo) | `umowa_rodzaj`, `umowa_do` | B1 ∋ umowa o pracę | umowa kończąca się po 3. mies. ciąży przedłuża się do porodu, chyba że to zastępstwo (art. 177 §3, §3¹ KP); zasiłek po ustaniu (art. 30 ust. 4 u.z.) | 👤 📄 |
-| B4 | Czy z danego tytułu podlegasz ubezpieczeniu chorobowemu? (przy zleceniu i działalności tylko dobrowolnie, po zgłoszeniu ZUS ZUA) | `chorobowe[tytul]` | B1 ≠ tylko umowa o pracę | „nie” = brak zasiłków z tego tytułu; przy zbiegu z umową o pracę z co najmniej minimalnym wynagrodzeniem nie można zgłosić się dobrowolnie z działalności ani ze zlecenia (Poradnik) | 🏛 📄 poświadczenie |
-| B5 | Od kiedy nieprzerwanie podlegasz ubezpieczeniu chorobowemu? Czy wcześniejsze okresy dzieliła przerwa do 30 dni (albo urlop wychowawczy lub bezpłatny)? | `chorobowe_od`, `okresy_wczesniejsze[]` | zawsze | okres wyczekiwania 30 albo 90 dni (art. 4 ust. 1–2); liczba pełnych miesięcy do podstawy | 🏛 📄 |
-| B6 | Czy masz co najmniej 10 lat obowiązkowego ubezpieczenia chorobowego albo zgłosiłeś(-aś) się do ubezpieczenia w ciągu 90 dni od ukończenia szkoły lub uczelni? | `zwolnienie_z_wyczekiwania` | ścieżka zasiłku chorobowego i B5 < 30/90 dni | prawo do zasiłku od 1. dnia (art. 4 ust. 3) | 👤 |
-| B7 | Czy w dniu porodu (przyjęcia dziecka) będziesz ubezpieczony(-a) chorobowo albo przebywał(a) na urlopie wychowawczym? | `ubezpieczony_w_dniu_zdarzenia` | ścieżki zasiłku macierzyńskiego | warunek konieczny zasiłku macierzyńskiego (art. 29 ust. 1); wyjątki w sekcji F | 🏛 👤 (wyliczane z B3, B5, S3) |
-| B8 | Zadłużenie składkowe na dzień powstania prawa do świadczenia | `zadluzenie_kwota` | B1 ∋ działalność lub współpraca | powyżej 1% minimalnego wynagrodzenia świadczenie nie przysługuje do czasu spłaty; brak spłaty przez 6 mies. = przedawnienie (art. 2a) | 🏛 |
-| B9 | Czy korzystasz z „ulgi na start”? | `ulga_na_start` | B1 ∋ działalność | brak ubezpieczeń = brak zasiłków (Poradnik) | 🏛 👤 |
-| B10 | Czy masz prawo do emerytury, renty z tytułu niezdolności do pracy, zasiłku dla bezrobotnych, świadczenia lub zasiłku przedemerytalnego, rodzicielskiego świadczenia uzupełniającego albo nauczycielskiego świadczenia kompensacyjnego? | `inne_swiadczenia[]` | ścieżki zasiłku chorobowego po ustaniu i świadczenia rehabilitacyjnego | wyłączenia (art. 13 ust. 1, art. 18 ust. 7) | 👤 🏛 |
-| B11 | Czy w okresie zwolnienia jesteś na urlopie bezpłatnym, wychowawczym albo opiekuńczym? | `urlop_bez_zasilku` | ścieżka zasiłku chorobowego | zasiłek za te okresy nie przysługuje (art. 12 ust. 2) | 📄 Z-3 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| B1 | Na jakiej podstawie pracujesz? (wielokrotny: umowa o pracę / zlecenie lub agencyjna / działalność / współpraca przy działalności / umowa o dzieło / inne / nie pracuję) | `tytuly[]` | rodzic | fakt | zawsze | urlop (tylko pracownik) albo zasiłek „za okres odpowiadający urlopowi”; kto wypłaca; sposób liczenia podstawy | zus_konto, upload:Z-3, upload:Z-3a, kreator |
+| B2 | Wymiar etatu | `etat` | rodzic | fakt | B1 ∋ umowa o pracę | minimalna podstawa przy pełnym etacie (art. 45); łączenie z urlopem rodzicielskim | zus_konto, upload:Z-3 (pkt 1), kreator |
+| B3 | Rodzaj umowy o pracę i data jej końca (nieokreślony / określony / próbny ponad 1 mies. / na zastępstwo) | `umowa_rodzaj`, `umowa_do` | rodzic | fakt | B1 ∋ umowa o pracę | umowa kończąca się po 3. mies. ciąży przedłuża się do porodu, chyba że to zastępstwo (art. 177 §3, §3¹ KP); zasiłek po ustaniu (art. 30 ust. 4 u.z.) | upload:Z-3 (pkt 1–2), kreator |
+| B4 | Czy z danego tytułu podlegasz ubezpieczeniu chorobowemu? (przy zleceniu i działalności tylko dobrowolnie, po zgłoszeniu ZUS ZUA) | `chorobowe[tytul]` | rodzic | fakt | B1 ≠ tylko umowa o pracę | „nie” = brak zasiłków z tego tytułu; przy zbiegu z umową o pracę z co najmniej minimalnym wynagrodzeniem nie można zgłosić się dobrowolnie z działalności ani ze zlecenia (Poradnik) | zus_konto, upload:poswiadczenie, kreator |
+| B5 | Od kiedy nieprzerwanie podlegasz ubezpieczeniu chorobowemu? Czy wcześniejsze okresy dzieliła przerwa do 30 dni (albo urlop wychowawczy lub bezpłatny)? | `chorobowe_od`, `okresy_wczesniejsze[]` | rodzic | fakt | zawsze | okres wyczekiwania 30 albo 90 dni (art. 4 ust. 1–2); liczba pełnych miesięcy do podstawy | zus_konto, upload:poswiadczenie, upload:zrzut_zus, kreator |
+| B6 | Czy masz co najmniej 10 lat obowiązkowego ubezpieczenia chorobowego albo zgłosiłeś(-aś) się do ubezpieczenia w ciągu 90 dni od ukończenia szkoły lub uczelni? | `zwolnienie_z_wyczekiwania` | rodzic | fakt | ścieżka zasiłku chorobowego i B5 < 30/90 dni | prawo do zasiłku od 1. dnia (art. 4 ust. 3) | zus_konto, kreator |
+| B7 | Czy w dniu porodu (przyjęcia dziecka) będziesz ubezpieczony(-a) chorobowo albo na urlopie wychowawczym? | `ubezpieczony_w_dniu_zdarzenia` | rodzic | **wyliczone** | ścieżki zasiłku macierzyńskiego | warunek konieczny (art. 29 ust. 1); wyjątki w sekcji F. Liczone z B3, B5, S3 i daty zdarzenia; jeśli zdarzenie w przyszłości → wynik **`warunkowo`** | wyliczone |
+| B8 | Zadłużenie składkowe na dzień powstania prawa | `zadluzenie_kwota` | rodzic | fakt | B1 ∋ działalność lub współpraca | powyżej 1% minimalnego wynagrodzenia świadczenie nie przysługuje do spłaty; brak spłaty przez 6 mies. = przedawnienie (art. 2a) | zus_platnik (zaświadczenie o zadłużeniu) |
+| B9 | Czy korzystasz z „ulgi na start”? | `ulga_na_start` | rodzic | fakt | B1 ∋ działalność | brak ubezpieczeń = brak zasiłków (Poradnik) | zus_konto, kreator |
+| B10 | Czy masz prawo do emerytury, renty z tytułu niezdolności do pracy, zasiłku dla bezrobotnych, świadczenia lub zasiłku przedemerytalnego, rodzicielskiego świadczenia uzupełniającego albo nauczycielskiego świadczenia kompensacyjnego? | `inne_swiadczenia[]` | rodzic | fakt | ścieżki zasiłku chorobowego po ustaniu i świadczenia rehabilitacyjnego | wyłączenia (art. 13 ust. 1, art. 18 ust. 7) | zus_historia, kreator |
+| B11 | Czy w okresie zwolnienia jesteś na urlopie bezpłatnym, wychowawczym albo opiekuńczym? | `urlop_bez_zasilku` | rodzic | fakt | ścieżka zasiłku chorobowego | zasiłek za te okresy nie przysługuje (art. 12 ust. 2) | upload:Z-3 (pkt 5), kreator |
 
 ## C. Kto ustala i wypłaca zasiłek
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| C1 | Ilu ubezpieczonych zgłaszał Twój płatnik do ubezpieczenia chorobowego na 30 listopada poprzedniego roku? (ponad 20 / najwyżej 20 / nie wiem) | `platnik_ponad_20[tytul]` | B1 ∋ umowa o pracę lub zlecenie | ponad 20 → wypłaca płatnik, w innym razie ZUS; przy działalności i po ustaniu ubezpieczenia zawsze ZUS (art. 61). Od tego zależy, gdzie złożyć dokumenty (wym. g) | 🏛 📄 Z-3 pkt 11 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| C1 | Ilu ubezpieczonych zgłaszał Twój płatnik do ubezpieczenia chorobowego na 30 listopada poprzedniego roku? (ponad 20 / najwyżej 20 / nie wiem) | `platnik_ponad_20[tytul]` | rodzic | fakt | B1 ∋ umowa o pracę lub zlecenie | wejście do C2 | zus_platnik, upload:Z-3 („Pozostałe informacje”), kreator |
+| C2 | Kto wypłaca? (płatnik / ZUS) | `kto_wyplaca[tytul]` | rodzic | **wyliczone** | B1 niepuste | ponad 20 → płatnik; w innym razie, przy działalności i po ustaniu ubezpieczenia → ZUS (art. 61). Od tego zależą kroki poradnika i „gdzie złożyć” (wym. g) | wyliczone |
 
 ## D. Ciąża – zasiłek chorobowy
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” | `ezla[]` | A1 ∋ ciąża | 100% podstawy z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | 🏛 e-ZLA 📄 |
-| D2 | Czy przed zwolnieniami z kodem B miałaś zwolnienia bez kodu B? Kiedy się skończyły? | `ezla_przed_ciaza[]` | D1 niepuste | okresów sprzed przerwy nie wlicza się do okresu zasiłkowego, jeśli po przerwie niezdolność przypada w ciąży (art. 9 ust. 2) | 🏛 |
-| D3 | Ile dni wynagrodzenia chorobowego wypłacił Ci pracodawca w tym roku kalendarzowym? | `dni_wynagr_chorobowego_rok` | B1 ∋ umowa o pracę | pierwsze 33 dni (14 dni po roku, w którym skończyłaś 50 lat) płaci pracodawca, potem zasiłek (art. 92 KP); w ciąży również 100% | 🏛 📄 Z-3 pkt 9 |
-| D4 | Czy niezdolność do pracy powstała po ustaniu tytułu ubezpieczenia? Data ustania, data początku niezdolności, czy trwała co najmniej 30 dni bez przerwy | `po_ustaniu{}` | D1 i ustał tytuł | prawo, jeśli niezdolność powstała do 14 dni od ustania (art. 7); w ciąży bez limitu 91 dni (art. 8 ust. 2) | 👤 📄 oświadczenie |
-| D5 | Czy po ustaniu tytułu kontynuujesz albo podjęłaś działalność zarobkową? | `praca_po_ustaniu` | D4 = tak | wyłącza zasiłek za okres po ustaniu (art. 13 ust. 1 pkt 2) | 👤 |
-| D6 | Czy w czasie zwolnienia wykonujesz pracę zarobkową (także z innego tytułu)? | `praca_na_zwolnieniu` | D1 niepuste | utrata zasiłku za całe zwolnienie (art. 17); od 2027 r. można nie wystawiać zwolnienia z tytułu, w którym da się pracować (art. 17 ust. 1d–1e) | 👤 (ostrzeżenie) |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” | `ezla[]` | rodzic (matka) | fakt | A1 ∋ ciąża | 100% z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | ezla, upload:ZAS-53, upload:Z-3 (okresy), upload:ZAS-12, kreator |
+| D2 | Czy przed zwolnieniami z kodem B były zwolnienia bez kodu B? Kiedy się skończyły? | `ezla_przed_ciaza[]` | rodzic (matka) | fakt | D1 niepuste | okresów sprzed przerwy nie wlicza się do okresu zasiłkowego, jeśli po przerwie niezdolność przypada w ciąży (art. 9 ust. 2) | ezla, kreator |
+| D3 | Ile dni wynagrodzenia chorobowego wypłacił pracodawca w tym roku kalendarzowym? | `dni_wynagr_chorobowego_rok` | rodzic | fakt | B1 ∋ umowa o pracę | pierwsze 33 dni (14 dni po roku, w którym skończyłaś 50 lat) płaci pracodawca, potem zasiłek (art. 92 KP); w ciąży również 100% | upload:Z-3 („Informacje o wypłaconych świadczeniach” pkt 1), zus_historia, kreator |
+| D4 | Czy niezdolność do pracy powstała po ustaniu tytułu ubezpieczenia? Data ustania, data początku niezdolności, czy trwała co najmniej 30 dni bez przerwy | `po_ustaniu{}` | rodzic | fakt | D1 i ustał tytuł | prawo, jeśli niezdolność powstała do 14 dni od ustania (art. 7); w ciąży bez limitu 91 dni (art. 8 ust. 2) | upload:ZAS-53, zus_konto, kreator |
+| D5 | Czy po ustaniu tytułu kontynuujesz albo podjęłaś działalność zarobkową? | `praca_po_ustaniu` | rodzic | fakt | D4 = tak | wyłącza zasiłek za okres po ustaniu (art. 13 ust. 1 pkt 2) | kreator |
+| D6 | Czy w czasie zwolnienia wykonujesz pracę zarobkową (także z innego tytułu)? | `praca_na_zwolnieniu` | rodzic | fakt | D1 niepuste | utrata zasiłku za całe zwolnienie (art. 17); od 2027 r. można nie wystawiać zwolnienia z tytułu, w którym da się pracować (art. 17 ust. 1d–1e) | kreator (ostrzeżenie) |
 
 ## E. Świadczenie rehabilitacyjne
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| E1 | Czy wyczerpałaś okres zasiłkowy (270 dni) i nadal jesteś niezdolna do pracy? | `okres_wyczerpany` (wyliczane z D1) | D1 suma ≥ 250 dni albo pytanie użytkownika | warunek prawa (art. 18 ust. 1) | 🏛 |
-| E2 | Czy lekarz prowadzący ocenia, że dalsze leczenie lub rehabilitacja rokują odzyskanie zdolności do pracy? | `rokowanie` | E1 = tak | o prawie decyduje lekarz orzecznik ZUS (art. 18 ust. 3), więc aplikacja tylko informuje | 👤 |
-| E3 | Czy niezdolność nadal przypada w ciąży? | `rehab_w_ciazy` | E1 = tak | 100% w ciąży; w innym razie 90% przez 3 mies., potem 75%; maksymalnie 12 mies. (art. 18 ust. 2, art. 19 ust. 1) | 👤 |
-| E4 | Data rozpoczęcia świadczenia | `rehab_od` | E1 = tak | waloryzacja podstawy według kwartału (art. 19 ust. 2) | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| E1 | Czy wyczerpałaś okres zasiłkowy (270 dni) i nadal jesteś niezdolna do pracy? | `okres_wyczerpany` | rodzic | **wyliczone** (z D1, D2) + fakt (dalsza niezdolność) | suma D1 ≥ 250 dni albo pytanie użytkownika | warunek prawa (art. 18 ust. 1) | wyliczone, kreator |
+| E2 | Czy lekarz prowadzący ocenia, że dalsze leczenie lub rehabilitacja rokują odzyskanie zdolności do pracy? | `rokowanie` | rodzic | fakt | E1 = tak | o prawie decyduje lekarz orzecznik ZUS (art. 18 ust. 3) → wynik najwyżej `warunkowo` | kreator, upload:zaswiadczenie_lek |
+| E3 | Czy niezdolność nadal przypada w ciąży? | `rehab_w_ciazy` | rodzic | fakt | E1 = tak | 100% w ciąży; w innym razie 90% przez 3 mies., potem 75%; maks. 12 mies. (art. 18 ust. 2, art. 19 ust. 1) | kreator, ezla |
+| E4 | Data rozpoczęcia świadczenia | `rehab_od` | rodzic | fakt | E1 = tak | waloryzacja podstawy według kwartału (art. 19 ust. 2) | kreator, zus_historia |
 
 Wyłączenia: pytanie B10.
 
 ## F. Utrata pracy w ciąży (zasiłek w wysokości zasiłku macierzyńskiego)
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| F1 | Czy umowa o pracę ustała w czasie ciąży? Kiedy? | `ustanie_data` | A1 ∋ ciąża i B1 ∋ umowa o pracę | ścieżka art. 30 | 👤 📄 świadectwo pracy |
-| F2 | Z jakiej przyczyny? (upadłość / likwidacja / śmierć pracodawcy / rozwiązanie z naruszeniem prawa potwierdzone prawomocnym wyrokiem / inna) | `ustanie_przyczyna` | F1 = tak | upadłość, likwidacja, śmierć → zasiłek w wysokości zasiłku macierzyńskiego do porodu (art. 30 ust. 3); cztery wymienione przyczyny → zasiłek macierzyński po porodzie (art. 30 ust. 1); „inna” → brak | 👤 📄 |
-| F3 | Czy zapewniono Ci inne zatrudnienie? | `inne_zatrudnienie` | F2 ∈ {upadłość, likwidacja, śmierć} | warunek art. 30 ust. 3 | 👤 📄 oświadczenie |
-| F4 | Czy ciążę stwierdzono zaświadczeniem lekarskim w czasie zatrudnienia? | `ciaza_w_zatrudnieniu` | F1 = tak | wymagany dokument (§15, §17 rozporządzenia) | 👤 📄 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| F1 | Czy umowa o pracę ustała w czasie ciąży? Kiedy? | `ustanie_data` | rodzic (matka) | fakt | A1 ∋ ciąża i B1 ∋ umowa o pracę | ścieżka art. 30 | zus_konto, upload:swiadectwo_pracy, kreator |
+| F2 | Z jakiej przyczyny? (upadłość / likwidacja / śmierć pracodawcy / rozwiązanie z naruszeniem prawa potwierdzone prawomocnym wyrokiem / inna) | `ustanie_przyczyna` | rodzic (matka) | fakt | F1 = tak | upadłość, likwidacja, śmierć → zasiłek w wysokości zasiłku macierzyńskiego do porodu (art. 30 ust. 3); cztery wymienione → zasiłek macierzyński po porodzie (art. 30 ust. 1); „inna” → brak | upload:wyrok, upload:swiadectwo_pracy, kreator |
+| F3 | Czy zapewniono Ci inne zatrudnienie? | `inne_zatrudnienie` | rodzic (matka) | fakt | F2 ∈ {upadłość, likwidacja, śmierć} | warunek art. 30 ust. 3 | kreator, zus_konto |
+| F4 | Czy ciążę stwierdzono zaświadczeniem lekarskim w czasie zatrudnienia? | `ciaza_w_zatrudnieniu` | rodzic (matka) | fakt | F1 = tak | wymagany dokument (§15, §17 rozporządzenia) | upload:zaswiadczenie_lek, kreator |
 
 ## G. Poród i dziecko
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| G1 | Przewidywana data porodu | `pdp` | A1 ∋ ciąża | urlop do 6 tyg. przed porodem; 3. miesiąc ciąży przy B3; oś czasu | 👤 📄 zaświadczenie |
-| G2 | Data porodu | `data_porodu` | A1 ∋ urodzenie | początek urlopu (art. 183¹ §2 KP); termin 21 dni na wariant 81,5%; limity wieku dziecka | 📄 akt urodzenia, ZAM |
-| G3 | Ile dzieci urodziło się przy jednym porodzie? | `liczba_dzieci` | A1 ∋ urodzenie lub ciąża | urlop macierzyński 20/31/33/35/37 tyg.; rodzicielski 41 albo 43 tyg. | 📄 ZAM |
-| G4 | Czy dziecko ma zaświadczenie „Za życiem”? | `za_zyciem` | A1 ∋ urodzenie lub przyjęcie | rodzicielski 65/67 tyg. (62 przy przyjęciu); limity łączenia z pracą 130/134 tyg. | 👤 📄 oświadczenie |
-| G5 | Czy dziecko zostało porzucone albo umieszczone (orzeczeniem sądu) w pieczy zastępczej, zakładzie opiekuńczo-leczniczym, pielęgnacyjno-opiekuńczym lub rehabilitacji leczniczej? Kiedy? | `umieszczenie_data` | A1 ∋ urodzenie | matce nie przysługuje część urlopu po tej dacie, ale co najmniej 8 tyg. po porodzie (art. 182 KP) | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| G1 | Przewidywana data porodu | `pdp` | rodzic (matka) | fakt | A1 ∋ ciąża | urlop do 6 tyg. przed porodem; 3. miesiąc ciąży przy B3; oś czasu; data zdarzenia dla B7, dopóki nie ma G2 | upload:zaswiadczenie_lek, kreator |
+| G2 | Data porodu | `data_porodu` | rodzic (matka) | fakt | A1 ∋ urodzenie | początek urlopu (art. 183¹ §2 KP); termin 21 dni na 81,5%; limity wieku. **Niespójność**, jeśli ≠ `data_urodzenia` dziecka | rsc, upload:akt, upload:ZAM, kreator |
+| G3 | Ile dzieci urodziło się przy jednym porodzie? | `liczba_dzieci` | rodzic (matka) | fakt | A1 ∋ urodzenie lub ciąża | urlop macierzyński 20/31/33/35/37 tyg.; rodzicielski 41 albo 43 tyg. **Niespójność**, jeśli po porodzie ≠ liczbie osób `dziecko` | rsc, upload:ZAM, upload:akt, kreator |
+| G4 | Czy dziecko ma zaświadczenie „Za życiem”? | `za_zyciem` | dziecko | fakt | A1 ∋ urodzenie lub przyjęcie | rodzicielski 65/67 tyg. (62 przy przyjęciu); limity łączenia z pracą 130/134 tyg. | upload:za_zyciem, upload:ZAM, kreator |
+| G5 | Czy dziecko zostało porzucone albo umieszczone (orzeczeniem sądu) w pieczy zastępczej, zakładzie opiekuńczo-leczniczym, pielęgnacyjno-opiekuńczym lub rehabilitacji leczniczej? Kiedy? | `umieszczenie_data` | dziecko | fakt | A1 ∋ urodzenie | matce nie przysługuje część urlopu po tej dacie, ale co najmniej 8 tyg. po porodzie (art. 182 KP) | upload:postanowienie, kreator |
 
 ## H. Wcześniak albo hospitalizacja dziecka (uzupełniający urlop macierzyński)
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| H1 | W którym tygodniu ciąży urodziło się dziecko? | `tydzien_ciazy` | A1 ∋ urodzenie i dziecko było w szpitalu | przed 28. tyg. → do 15. tyg. po porodzie; 28–37 tyg. i ponad 1000 g → do 8. tyg.; po 37. tyg. → od 5. dnia do 8. tyg. (art. 180² KP) | 📄 zaświadczenie szpitala |
-| H2 | Masa urodzeniowa każdego dziecka (g) | `masa_g[]` | jw. | do 1000 g → wariant do 15. tyg.; przy wieloraczkach liczy się najniższa masa | 📄 |
-| H3 | Okresy pobytu w szpitalu po porodzie (od–do, każde dziecko) | `hospitalizacje[]` | jw. | tydzień urlopu za tydzień pobytu, okresy się sumuje, niepełny tydzień w górę; po 37. tyg. ciąży co najmniej 2 kolejne dni, z pierwszym w 5.–28. dniu; przy wieloraczkach najdłuższa hospitalizacja | 📄 |
-| H4 | Kto skorzysta (matka / ojciec)? Czy drugi rodzic oświadcza, że nie skorzysta? | `uzup_kto`, `uzup_oswiadczenie_drugiego` | jw. | tylko jeden rodzic, jednorazowo, bezpośrednio po urlopie macierzyńskim | 👤 📄 |
-| H5 | (przy przyjęciu dziecka) Czy pobyt w szpitalu był już po przyjęciu na wychowanie? | `hosp_po_przyjeciu` | A1 ∋ przyjęcie | warunek art. 183 §3¹ KP | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| H1 | W którym tygodniu ciąży urodziło się dziecko? | `tydzien_ciazy` | dziecko | fakt | A1 ∋ urodzenie i dziecko było w szpitalu | przed 28. tyg. → do 15. tyg. po porodzie; 28–37 tyg. i ponad 1000 g → do 8. tyg.; po 37. tyg. → od 5. dnia do 8. tyg. (art. 180² KP) | upload:karta_szpitala, kreator |
+| H2 | Masa urodzeniowa (g) | `masa_g` | dziecko | fakt | jw. | do 1000 g → wariant do 15. tyg.; przy wieloraczkach liczy się najniższa masa (min. po dzieciach) | upload:karta_szpitala, kreator |
+| H3 | Okresy pobytu w szpitalu po porodzie (od–do) | `hospitalizacje[]` | dziecko | fakt | jw. | tydzień urlopu za tydzień pobytu, okresy się sumuje, niepełny tydzień w górę; po 37. tyg. co najmniej 2 kolejne dni, z pierwszym w 5.–28. dniu; przy wieloraczkach najdłuższa hospitalizacja | upload:karta_szpitala, kreator |
+| H4 | Kto skorzysta (matka / ojciec)? Czy drugi rodzic oświadcza, że nie skorzysta? | `uzup_kto` → **wybór**; `uzup_oswiadczenie_drugiego` → fakt | rodzic | wybór + fakt | jw. | tylko jeden rodzic, jednorazowo, bezpośrednio po urlopie macierzyńskim | scenariusz; upload:oswiadczenie, kreator |
+| H5 | (przy przyjęciu) Czy pobyt w szpitalu był już po przyjęciu na wychowanie? | `hosp_po_przyjeciu` | dziecko | fakt | A1 ∋ przyjęcie | warunek art. 183 §3¹ KP | kreator |
 
 ## I. Martwe urodzenie lub zgon dziecka
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| I1 | Czy dziecko urodziło się martwe? | `martwe_urodzenie` | A1 ∋ martwe lub zgon | 8 tyg. po porodzie (art. 180¹ §1 KP) | 📄 akt z adnotacją / zaświadczenie |
-| I2 | Data zgonu dziecka (każdego) | `data_zgonu[]` | A1 ∋ martwe lub zgon | zgon przed 8. tyg. życia → 8 tyg. po porodzie, ale co najmniej 7 dni od zgonu; później → 7 dni od zgonu | 📄 |
-| I3 | Ile dzieci z tego porodu żyje? | `dzieci_zyjace` | G3 > 1 | wymiar urlopu według liczby żyjących dzieci | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| I1 | Czy dziecko urodziło się martwe? | `martwe_urodzenie` | dziecko | fakt | A1 ∋ martwe lub zgon | 8 tyg. po porodzie (art. 180¹ §1 KP) | rsc, upload:akt, upload:zaswiadczenie_lek, kreator |
+| I2 | Data zgonu dziecka | `data_zgonu` | dziecko | fakt | A1 ∋ martwe lub zgon | zgon przed 8. tyg. życia → 8 tyg. po porodzie, ale co najmniej 7 dni od zgonu; później → 7 dni od zgonu | rsc, upload:akt_zgonu, kreator |
+| I3 | Ile dzieci z tego porodu żyje? | `dzieci_zyjace` | rodzic (matka) | **wyliczone** (z I1, I2 dzieci) | G3 > 1 | wymiar urlopu według liczby żyjących dzieci | wyliczone |
 
-Dodatkowa informacja (poza listą świadczeń): przy martwym urodzeniu przysługuje zasiłek pogrzebowy 7000 zł (Poradnik).
+Dodatkowa informacja (poza listą świadczeń, treść w `content/`): przy martwym urodzeniu przysługuje zasiłek pogrzebowy
+(kwota w parametrach). Ton komunikatów: spokojny, bez wykrzykników.
 
 ## J. Urlop macierzyński – plan i wariant wypłaty
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| J1 | Czy chcesz zacząć urlop (zasiłek) przed porodem? Od kiedy? | `macierzynski_od` | A1 ∋ ciąża i A2 = matka | najwyżej 6 tyg. przed porodem; potrzebne zaświadczenie o przewidywanej dacie porodu; wniosek 14 dni przed | 👤 📄 |
-| J2 | Wariant wypłaty: 81,5% za cały okres czy 100% + 70%? Data złożenia wniosku | `wariant`, `wniosek_81_5_data` | ścieżki macierzyński i rodzicielski | 81,5% tylko przy wniosku do 21 dni po porodzie (przyjęciu); 9 tyg. drugiego rodzica zawsze 70% (art. 30a, art. 31 ust. 3, 3f) | 👤 📄 ZAM |
-| J3 | Czy co najmniej jeden dzień urlopu rodzicielskiego wykorzystasz przed 1. urodzinami dziecka? | `rodz_w_1_roku` | J2 = 81,5% | jeśli nie: rodzicielski po 70%, a macierzyński wyrównywany do 100% na wniosek (art. 31 ust. 3g, ust. 4; zał. 6 pkt 15) | 👤 |
-| J4 | Czy matka wróci do pracy po co najmniej 14 tyg. i odda resztę urlopu ojcu? Od kiedy? | `rezygnacja_od` | A3 = tak | art. 180 §4–5 KP, art. 29 ust. 3 u.z.; wniosek o rezygnację 7 dni przed powrotem, wniosek ojca 14 dni przed | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| J1 | Czy chcesz zacząć urlop (zasiłek) przed porodem? Od kiedy? | `macierzynski_od` → `wybory.start_urlopu_macierzynskiego` | rodzic (matka) | **wybór** (fakt, gdy już udzielony – Z-3 pkt 6, ZAM) | A1 ∋ ciąża i A2 = matka | najwyżej 6 tyg. przed porodem; potrzebne zaświadczenie o przewidywanej dacie porodu; wniosek 14 dni przed | scenariusz; upload:Z-3, upload:ZAM |
+| J2 | Wariant wypłaty: 81,5% za cały okres czy 100% + 70%? Data złożenia wniosku | `wariant` → `wybory.wniosek_81_5`; `wniosek_81_5_data` → fakt | rodzic | **wybór** + fakt (data złożonego wniosku) | ścieżki macierzyński i rodzicielski | 81,5% tylko przy wniosku do 21 dni po porodzie (przyjęciu); 9 tyg. drugiego rodzica zawsze 70% (art. 30a, art. 31 ust. 3, 3f) | scenariusz; upload:ZAM, upload:Z-3 (pkt 6 „data złożenia wniosku”) |
+| J3 | Czy co najmniej jeden dzień urlopu rodzicielskiego wykorzystasz przed 1. urodzinami dziecka? | `rodz_w_1_roku` | rodzic | **wyliczone** (z `wybory.podzial_rodzicielskiego`) | J2 = 81,5% | jeśli nie: rodzicielski po 70%, a macierzyński wyrównywany do 100% na wniosek (art. 31 ust. 3g, ust. 4; zał. 6 pkt 15) | wyliczone |
+| J4 | Czy matka wróci do pracy po co najmniej 14 tyg. i odda resztę urlopu ojcu? Od kiedy? | `rezygnacja_od` → `wybory.przejecie_macierzynskiego_przez` | rodzic | **wybór** | A3 = tak | art. 180 §4–5 KP, art. 29 ust. 3 u.z.; wniosek o rezygnację 7 dni przed powrotem, wniosek ojca 14 dni przed | scenariusz |
 
 ## K. Szczególne sytuacje matki (prawa ojca albo członka rodziny)
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| K1 | Czy matka dziecka ma tytuł do ubezpieczenia chorobowego (jest ubezpieczona)? | `matka_ubezpieczona` | A2 ≠ matka | rozróżnia ścieżki: ubezpieczona (art. 29 ust. 3–7) i bez tytułu (ust. 9–10); rodzicielski ojca, gdy matka nieubezpieczona | 👤 🏛 |
-| K2 | Czy matka ma orzeczenie o niezdolności do samodzielnej egzystencji? | `matka_nse` | A2 ≠ matka | przejęcie urlopu po 8 tyg. (art. 29 ust. 5, art. 180 §6–7 KP) | 👤 📄 orzeczenie |
-| K3 | Czy matka przebywa w szpitalu i nie może opiekować się dzieckiem? Daty przyjęcia i wypisu | `matka_szpital[]` | A2 ≠ matka | ojciec przejmuje zasiłek za ten okres po 8 tyg. (art. 29 ust. 6, art. 180 §10–11 KP) | 📄 zaświadczenia |
-| K4 | Czy matka zmarła albo porzuciła dziecko? Data | `matka_zgon_porzucenie` | A2 ≠ matka | przejęcie od dnia zdarzenia; przy porzuceniu nie wcześniej niż po 8 tyg. (art. 29 ust. 7 i 9) | 👤 📄 oświadczenie |
-| K5 | (matka bez tytułu do ubezpieczenia) Czy matka podjęła zatrudnienie na co najmniej pół etatu? Od–do | `matka_zatrudnienie` | K1 = nie | ojciec dostaje zasiłek do wyczerpania wymiaru, najdłużej na czas jej zatrudnienia (art. 29 ust. 10, art. 180 §17 KP) | 👤 📄 oświadczenie |
-| K6 | Czy ojciec (członek rodziny) przerwie działalność zarobkową, żeby opiekować się dzieckiem, albo dostanie urlop od pracodawcy? | `przerwanie_dzialalnosci` | A2 ≠ matka | warunek przejęcia zasiłku przez osobę, która nie jest pracownikiem | 👤 |
-| K7 | Za jaki okres i w jakiej stawce wypłacono już zasiłek matce? | `wyplacono_matce{}` | A2 ≠ matka | okres zasiłku ojca zmniejsza się o okres wypłacony matce (art. 29a ust. 2) | 📄 zaświadczenie płatnika |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| K1 | Czy matka dziecka ma tytuł do ubezpieczenia chorobowego? | `matka_ubezpieczona` | wnioskodawca (≠ matka) | fakt | A2 ≠ matka | ścieżki: ubezpieczona (art. 29 ust. 3–7) i bez tytułu (ust. 9–10); rodzicielski ojca, gdy matka nieubezpieczona. Jeśli matka jest osobą w sprawie → **wyliczone** z jej pól B | wyliczone, kreator |
+| K2 | Czy matka ma orzeczenie o niezdolności do samodzielnej egzystencji? | `matka_nse` | wnioskodawca (≠ matka) | fakt | A2 ≠ matka | przejęcie urlopu po 8 tyg. (art. 29 ust. 5, art. 180 §6–7 KP) | upload:orzeczenie, kreator |
+| K3 | Czy matka przebywa w szpitalu i nie może opiekować się dzieckiem? Daty przyjęcia i wypisu | `matka_szpital[]` | wnioskodawca (≠ matka) | fakt | A2 ≠ matka | ojciec przejmuje zasiłek za ten okres po 8 tyg. (art. 29 ust. 6, art. 180 §10–11 KP) | upload:karta_szpitala, kreator |
+| K4 | Czy matka zmarła albo porzuciła dziecko? Data | `matka_zgon_porzucenie` | wnioskodawca (≠ matka) | fakt | A2 ≠ matka | przejęcie od dnia zdarzenia; przy porzuceniu nie wcześniej niż po 8 tyg. (art. 29 ust. 7 i 9) | rsc, upload:akt_zgonu, kreator |
+| K5 | (matka bez tytułu) Czy matka podjęła zatrudnienie na co najmniej pół etatu? Od–do | `matka_zatrudnienie` | wnioskodawca (≠ matka) | fakt | K1 = nie | ojciec dostaje zasiłek do wyczerpania wymiaru, najdłużej na czas jej zatrudnienia (art. 29 ust. 10, art. 180 §17 KP) | kreator, upload:oswiadczenie |
+| K6 | Czy ojciec (członek rodziny) przerwie działalność zarobkową, żeby opiekować się dzieckiem, albo dostanie urlop od pracodawcy? | `przerwanie_dzialalnosci` | wnioskodawca (≠ matka) | plan | A2 ≠ matka | warunek przejęcia zasiłku przez osobę, która nie jest pracownikiem | kreator |
+| K7 | Za jaki okres i w jakiej stawce wypłacono już zasiłek matce? | `wyplacono_matce{}` | wnioskodawca (≠ matka) | fakt | A2 ≠ matka | okres zasiłku ojca zmniejsza się o okres wypłacony matce (art. 29a ust. 2) | zus_historia, upload:Z-3 (matki), kreator |
 
-## L. Urlop rodzicielski – plan, podział, łączenie z pracą
+## L. Urlop rodzicielski – podział i łączenie z pracą
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| L1 | Plan części urlopu: dla każdej części kto (matka / ojciec), od–do, czy jednocześnie z drugim rodzicem | `rodzicielski_czesci[]` | ścieżka rodzicielska | pula 41/43 (65/67) tyg. wspólna dla obojga; po 9 tyg. nieprzenoszalnych dla każdego rodzica; razem najwyżej 5 części; do końca roku, w którym dziecko kończy 6 lat; przy jednoczesnym korzystaniu łączny wymiar nie przekracza puli (art. 182¹a, 182¹c KP; art. 29a ust. 3) | 👤 📄 ZAM |
-| L2 | Ile urlopu rodzicielskiego już wykorzystano (tygodnie, liczba części, stawka)? | `rodzicielski_wykorzystany{}` | ścieżka rodzicielska | limit części i puli; liczą się także wnioski osób, które nie są pracownikami (art. 182¹d §2 KP) | 🏛 📄 |
-| L3 | Czy w trakcie części urlopu będziesz pracować u tego samego pracodawcy? W jakim wymiarze (najwyżej ½) i przez ile tygodni? | `laczenie_praca[]{wymiar, od, do}` | B1 ∋ umowa o pracę | zasiłek maleje proporcjonalnie (art. 31 ust. 4a); urlop wydłuża się o liczbę tygodni × wymiar, najwyżej do 82/86 (130/134) tyg. (art. 182¹e–f KP) | 👤 |
-| L4 | Czy wydłużoną część urlopu też chcesz łączyć z pracą? W jakim wymiarze? | `laczenie_wydluzenia` | L3 niepuste | wzór art. 182¹f §7 KP (długość ÷ (1 − wymiar)) | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| L1 | Plan części urlopu: dla każdej części kto, od–do, czy jednocześnie z drugim rodzicem | `rodzicielski_czesci[]` → `wybory.podzial_rodzicielskiego` | sprawa | **wybór** | ścieżka rodzicielska | pula 41/43 (65/67) tyg. wspólna; po 9 tyg. nieprzenoszalnych dla każdego rodzica; razem najwyżej 5 części; do końca roku, w którym dziecko kończy 6 lat; przy jednoczesnym korzystaniu łączny wymiar nie przekracza puli (art. 182¹a, 182¹c KP; art. 29a ust. 3) | scenariusz |
+| L2 | Ile urlopu rodzicielskiego już wykorzystano (tygodnie, liczba części, stawka)? | `rodzicielski_wykorzystany{}` | rodzic | fakt | ścieżka rodzicielska | limit części i puli; liczą się także wnioski osób, które nie są pracownikami (art. 182¹d §2 KP) | zus_historia, upload:Z-3, upload:ZAM, kreator |
+| L3 | Czy w trakcie części urlopu będziesz pracować u tego samego pracodawcy? W jakim wymiarze (najwyżej ½) i przez ile tygodni? | `laczenie_praca[]` → `wybory.podzial_rodzicielskiego[].praca_wymiar` | rodzic | **wybór** (fakt, gdy już udzielony – Z-3 pkt 7) | B1 ∋ umowa o pracę | zasiłek maleje proporcjonalnie (art. 31 ust. 4a); urlop wydłuża się o liczbę tygodni × wymiar, najwyżej do 82/86 (130/134) tyg. (art. 182¹e–f KP) | scenariusz; upload:Z-3 |
+| L4 | Czy wydłużoną część urlopu też chcesz łączyć z pracą? W jakim wymiarze? | `laczenie_wydluzenia` → `wybory.podzial_rodzicielskiego[].praca_wymiar_wydluzenia` | rodzic | **wybór** | L3 niepuste | wzór art. 182¹f §7 KP (długość ÷ (1 − wymiar)) | scenariusz |
 
 ## M. Urlop ojcowski
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| M1 | Plan: 14 dni jednorazowo czy 2 części po co najmniej 7 dni? Daty | `ojcowski_czesci[]` | A2 = ojciec | 2 tyg. ze 100%; do ukończenia przez dziecko 12 mies.; liczba dzieci nie wydłuża urlopu (art. 182³ KP) | 👤 📄 |
-| M2 | Czy wykorzystałeś już część urlopu ojcowskiego? Czy zasiłek za urlop ojcowski pobrałeś z innego tytułu? | `ojcowski_wykorzystany`, `ojcowski_inny_tytul` | A2 = ojciec | limit 14 dni; wymagane oświadczenie (§33 rozporządzenia) | 👤 🏛 |
-| M3 | (adopcja) Data uprawomocnienia postanowienia o przysposobieniu | `przysposobienie_prawomocne` | A1 ∋ przyjęcie i A2 = ojciec | 12 mies. od uprawomocnienia, najpóźniej do 14. urodzin dziecka | 📄 postanowienie |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| M1 | Plan: 14 dni jednorazowo czy 2 części po co najmniej 7 dni? Daty | `ojcowski_czesci[]` → `wybory.urlop_ojcowski` | rodzic (ojciec) | **wybór** | A2 = ojciec | 2 tyg. ze 100%; do ukończenia przez dziecko 12 mies.; liczba dzieci nie wydłuża urlopu (art. 182³ KP) | scenariusz; upload:ZAO (archiwalny), upload:ZAM |
+| M2 | Czy wykorzystałeś już część urlopu ojcowskiego? Czy zasiłek za urlop ojcowski pobrałeś z innego tytułu? | `ojcowski_wykorzystany`, `ojcowski_inny_tytul` | rodzic (ojciec) | fakt | A2 = ojciec | limit 14 dni; wymagane oświadczenie (§33 rozporządzenia) | zus_historia, kreator |
+| M3 | (adopcja) Data uprawomocnienia postanowienia o przysposobieniu | `przysposobienie_prawomocne` | dziecko | fakt | A1 ∋ przyjęcie i A2 = ojciec | 12 mies. od uprawomocnienia, najpóźniej do 14. urodzin dziecka | upload:postanowienie, kreator |
 
 ## N. Przyjęcie dziecka na wychowanie (adopcja, rodzina zastępcza)
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| N1 | Forma przyjęcia (przysposobienie z wnioskiem do sądu / rodzina zastępcza niezawodowa / rodzina zastępcza zawodowa / inna) | `forma_przyjecia` | A1 ∋ przyjęcie | zawodowa rodzina zastępcza i „inna” → brak prawa (art. 29 ust. 1 pkt 2–3) | 👤 📄 orzeczenie lub umowa ze starostą |
-| N2 | Data przyjęcia dziecka na wychowanie | `data_przyjecia` | A1 ∋ przyjęcie | początek uprawnień; wniosek o urlop 7 dni od przyjęcia, start najpóźniej po 21 dniach (art. 183 §6 KP); 81,5% przy wniosku do 21 dni | 👤 📄 oświadczenie |
-| N3 | Data wystąpienia do sądu o przysposobienie | `data_wniosku_sad` | N1 = przysposobienie | warunek prawa | 📄 zaświadczenie sądu |
-| N4 | Data urodzenia każdego dziecka | `dziecko_data_ur[]` | A1 ∋ przyjęcie | rodzina zastępcza: do 7 lat (10 przy odroczeniu); przysposobienie: do 14 lat; urlop kończy się z limitem wieku, ale trwa co najmniej 9 tyg.; wtedy rodzicielski 38 (62) tyg. (art. 183 §1–4² KP) | 📄 |
-| N5 | Czy dziecku odroczono obowiązek szkolny? | `odroczenie_szkolne` | N1 = rodzina zastępcza | limit 10 lat | 📄 decyzja |
-| N6 | Ile dzieci przyjęto jednocześnie? | `liczba_przyjetych` | A1 ∋ przyjęcie | 20/31/33/35/37 tyg.; rodzicielski 41/43 | 👤 📄 |
-| N7 | Czy jako rodzina zastępcza korzystałeś(-aś) już z urlopu na warunkach urlopu macierzyńskiego lub rodzicielskiego dla tego dziecka? Ile? | `wykorzystane_jako_rz{}` | N1 = przysposobienie | wymiar zmniejsza się o wykorzystane okresy (art. 183 §7–8 KP) | 👤 🏛 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| N1 | Forma przyjęcia (przysposobienie z wnioskiem do sądu / rodzina zastępcza niezawodowa / zawodowa / inna) | `forma_przyjecia` | rodzic | fakt | A1 ∋ przyjęcie | zawodowa rodzina zastępcza i „inna” → brak prawa (art. 29 ust. 1 pkt 2–3); `Sprawa.zdarzenie` | upload:postanowienie, upload:umowa_starosta, kreator |
+| N2 | Data przyjęcia dziecka na wychowanie | `data_przyjecia` | dziecko | fakt | A1 ∋ przyjęcie | początek uprawnień; wniosek o urlop 7 dni od przyjęcia, start najpóźniej po 21 dniach (art. 183 §6 KP); 81,5% przy wniosku do 21 dni | upload:postanowienie, upload:oswiadczenie, kreator |
+| N3 | Data wystąpienia do sądu o przysposobienie | `data_wniosku_sad` | dziecko | fakt | N1 = przysposobienie | warunek prawa | upload:zaswiadczenie_sadu, kreator |
+| N4 | Data urodzenia dziecka | `data_urodzenia` (pole A4 osoby `dziecko`; dawniej `dziecko_data_ur[]`) | dziecko | fakt | A1 ∋ przyjęcie | rodzina zastępcza: do 7 lat (10 przy odroczeniu); przysposobienie: do 14 lat; urlop kończy się z limitem wieku, ale trwa co najmniej 9 tyg.; wtedy rodzicielski 38 (62) tyg. (art. 183 §1–4² KP) | rsc, upload:akt, kreator |
+| N5 | Czy dziecku odroczono obowiązek szkolny? | `odroczenie_szkolne` | dziecko | fakt | N1 = rodzina zastępcza | limit 10 lat | upload:decyzja, kreator |
+| N6 | Ile dzieci przyjęto jednocześnie? | `liczba_przyjetych` | rodzic | **wyliczone** (liczba osób `dziecko` z tą samą `data_przyjecia`) | A1 ∋ przyjęcie | 20/31/33/35/37 tyg.; rodzicielski 41/43 | wyliczone, kreator |
+| N7 | Czy jako rodzina zastępcza korzystałeś(-aś) już z urlopu na warunkach urlopu macierzyńskiego lub rodzicielskiego dla tego dziecka? Ile? | `wykorzystane_jako_rz{}` | rodzic | fakt | N1 = przysposobienie | wymiar zmniejsza się o wykorzystane okresy (art. 183 §7–8 KP) | zus_historia, kreator |
 
-Pytania wspólne: G4 („Za życiem”), J2 (wariant 81,5% liczony od przyjęcia), L1–L4, M3.
+Pytania wspólne: G4 („Za życiem”), J2 (81,5% liczone od przyjęcia), L1–L4, M3.
 
 ## O. Podstawa wymiaru – pracownik
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| O1 | Data powstania prawa do zasiłku (pierwszy dzień zwolnienia, porodu albo przyjęcia) | `data_prawa` (wyliczane) | zawsze przy kwocie | wyznacza 12 miesięcy kalendarzowych wstecz (art. 36 ust. 1) | 📄 |
-| O2 | Czy tuż przed (przerwa krótsza niż miesiąc kalendarzowy) pobierałaś inny zasiłek, np. chorobowy w ciąży? Jaka była jego podstawa? | `poprzedni_zasilek{data_do, podstawa}` | zawsze przy kwocie | podstawy nie ustala się na nowo (art. 43), chyba że zmienił się wymiar etatu | 🏛 📄 Z-3, decyzje |
-| O3 | Od kiedy jesteś zatrudniony(-a) u tego płatnika bez przerwy? | `zatrudnienie_od` | B1 ∋ umowa o pracę | krócej niż 12 mies. → pełne miesiące; krócej niż 1 mies. → wynagrodzenie z umowy (art. 36 ust. 2, art. 37) | 📄 Z-3 pkt 4 |
-| O4 | Wynagrodzenie za każdy z 12 miesięcy: składniki stałe, składniki zmienne, dni przepracowane i obowiązujące, przyczyna nieprzepracowania | `miesiace[]` | B1 ∋ umowa o pracę | miesiące z mniej niż połową czasu pracy pomija się; pozostałe uzupełnia się do pełnego miesiąca; minus 13,71% (art. 38, załącznik ZUS) | 📄 Z-3 pkt 16 · 👤 tryb uproszczony: „średnie brutto z 12 mies.” |
-| O5 | Premie i nagrody kwartalne (4 kwartały) oraz roczne (poprzedni rok) | `premie_kwartalne[]`, `premie_roczne` | jw. | doliczane po 1/12 (art. 42) | 📄 Z-3 |
-| O6 | Czy któreś składniki przysługują też w czasie zasiłku albo tylko do określonego terminu? | `skladniki_wylaczone[]` | jw. | pomija się je w podstawie (art. 41) | 📄 Z-3 |
-| O7 | Czy w tym okresie zmienił się wymiar etatu? Kiedy? | `zmiana_etatu{data, nowy}` | jw. | podstawa według nowego wymiaru (art. 40) | 📄 Z-3 pkt 4 |
-| O8 | Czy u tego pracodawcy masz też umowę zlecenia lub o dzieło? Kwoty za kolejne miesiące | `umowy_u_pracodawcy[]` | jw. | przychód wliczany do podstawy (Z-3 pkt 17) | 📄 Z-3 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| O1 | Data powstania prawa do zasiłku | `data_prawa` | rodzic | **wyliczone** (pierwszy dzień zwolnienia, porodu albo przyjęcia) | zawsze przy kwocie | wyznacza 12 miesięcy kalendarzowych wstecz (art. 36 ust. 1) i wersję parametrów | wyliczone |
+| O2 | Czy tuż przed (przerwa krótsza niż miesiąc kalendarzowy) pobierałaś inny zasiłek? Jaka była jego podstawa? | `poprzedni_zasilek{data_do, podstawa}` | rodzic | fakt | zawsze przy kwocie | podstawy nie ustala się na nowo (art. 43), chyba że zmienił się wymiar etatu | zus_historia, upload:Z-3, upload:decyzja, kreator |
+| O3 | Od kiedy jesteś zatrudniony(-a) u tego płatnika bez przerwy? | `zatrudnienie_od` | rodzic | fakt | B1 ∋ umowa o pracę | krócej niż 12 mies. → pełne miesiące; krócej niż 1 mies. → wynagrodzenie z umowy (art. 36 ust. 2, art. 37) | zus_konto, upload:Z-3 (pkt 1), kreator |
+| O4 | Wynagrodzenie za każdy z 12 miesięcy: składniki stałe, zmienne, dni przepracowane i obowiązujące, przyczyna nieprzepracowania | `miesiace[]` | rodzic | fakt | B1 ∋ umowa o pracę | miesiące z mniej niż połową czasu pracy pomija się; pozostałe uzupełnia się do pełnego miesiąca; minus 13,71% (art. 38, załącznik ZUS) | upload:Z-3 („Składniki wynagrodzenia” pkt 1), zus_konto (RCA – przybliżenie) · kreator: tryb uproszczony `O4s` „średnie brutto z 12 mies.” → wynik **orientacyjny** |
+| O5 | Premie i nagrody kwartalne (4 kwartały) oraz roczne (poprzedni rok) | `premie_kwartalne[]`, `premie_roczne` | rodzic | fakt | jw. | doliczane po 1/12 (art. 42) | upload:Z-3 (pkt 2–3), kreator |
+| O6 | Czy któreś składniki przysługują też w czasie zasiłku albo tylko do określonego terminu? | `skladniki_wylaczone[]` | rodzic | fakt | jw. | pomija się je w podstawie (art. 41) | upload:Z-3, kreator |
+| O7 | Czy w tym okresie zmienił się wymiar etatu? Kiedy? | `zmiana_etatu{data, nowy}` | rodzic | fakt | jw. | podstawa według nowego wymiaru (art. 40) | zus_konto, upload:Z-3 (pkt 1), kreator |
+| O8 | Czy u tego pracodawcy masz też umowę zlecenia lub o dzieło? Kwoty za kolejne miesiące | `umowy_u_pracodawcy[]` | rodzic | fakt | jw. | przychód wliczany do podstawy | upload:Z-3 (pkt 5 „Składniki”), kreator |
 
-Reguły bez pytań: podstawa przy pełnym etacie nie niższa niż minimalne wynagrodzenie minus 13,71% (art. 45); dzienna stawka = 1/30 podstawy (art. 36 ust. 3).
+Reguły bez pytań: podstawa przy pełnym etacie nie niższa niż minimalne wynagrodzenie minus 13,71% (art. 45);
+dzienna stawka = 1/30 podstawy (art. 36 ust. 3).
 
 ## P. Podstawa wymiaru – zleceniobiorca
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| P1 | Przychód (podstawa składek) za każdy z 12 miesięcy oraz dni przepracowane i obowiązujące | `przychod_miesiace[]` | B1 ∋ zlecenie | średnia minus 13,71% (art. 48, art. 3 pkt 4); miesiące z pracą krótszą niż pół miesiąca przez zasiłki są pomijane (art. 50) | 📄 Z-3a pkt 14 |
-| P2 | Czy to kolejne umowy z tym samym zleceniodawcą bez przerwy? | `ciaglosc_zlecen` | B1 ∋ zlecenie | okres nieprzerwanego ubezpieczenia (Poradnik) | 📄 🏛 |
-| P3 | Jeśli zachorowałaś (urodziłaś) w pierwszym miesiącu: kwota przychodu z umowy za ten miesiąc | `przychod_umowny` | ubezpieczenie krótsze niż miesiąc | art. 49 ust. 1 pkt 2 | 📄 umowa |
-| P4 | Czy przed tym ubezpieczeniem było inne, zakończone najwyżej 30 dni wcześniej? | `poprzedni_tytul_30dni` | ubezpieczenie krótsze niż 12 mies. | łączenie okresów (art. 48a ust. 2, art. 49 ust. 2) | 🏛 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| P1 | Przychód (podstawa składek) za każdy z 12 miesięcy oraz dni przepracowane i obowiązujące | `przychod_miesiace[]` | rodzic | fakt | B1 ∋ zlecenie | średnia minus 13,71% (art. 48, art. 3 pkt 4); miesiące z pracą krótszą niż pół miesiąca przez zasiłki są pomijane (art. 50) | upload:Z-3a (pkt 14), zus_konto (RCA), kreator |
+| P2 | Czy to kolejne umowy z tym samym zleceniodawcą bez przerwy? | `ciaglosc_zlecen` | rodzic | fakt | B1 ∋ zlecenie | okres nieprzerwanego ubezpieczenia (Poradnik) | zus_konto, upload:Z-3a, kreator |
+| P3 | Jeśli zachorowałaś (urodziłaś) w pierwszym miesiącu: kwota przychodu z umowy za ten miesiąc | `przychod_umowny` | rodzic | fakt | ubezpieczenie krótsze niż miesiąc | art. 49 ust. 1 pkt 2 | upload:umowa, kreator |
+| P4 | Czy przed tym ubezpieczeniem było inne, zakończone najwyżej 30 dni wcześniej? | `poprzedni_tytul_30dni` | rodzic | fakt (zus) / wyliczone z B5 | ubezpieczenie krótsze niż 12 mies. | łączenie okresów (art. 48a ust. 2, art. 49 ust. 2) | zus_konto, kreator |
 
 ## Q. Podstawa wymiaru – działalność gospodarcza
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| Q1 | Zadeklarowana podstawa składki chorobowej za każdy z ostatnich 12 miesięcy | `podstawa_deklarowana[]` | B1 ∋ działalność | średnia minus 13,71%; limit 20 321,30 zł w 2026 r. (załącznik ZUS) | 🏛 📄 Z-3b, poświadczenie |
-| Q2 | Rodzaj składek: standardowe / preferencyjne / mały ZUS+ / dobrowolnie wyższa podstawa | `rodzaj_skladek` | jw. | „najniższa podstawa” we wzorze art. 48a (ust. 5) | 🏛 |
-| Q3 | Liczba pełnych miesięcy ubezpieczenia chorobowego z tytułu działalności | `miesiace_ubezpieczenia` | jw. | poniżej 12 → wzór art. 48a: najniższa podstawa + (nadwyżka ÷ 12) × liczba miesięcy | 🏛 |
-| Q4 | Czy były przerwy w ubezpieczeniu z powodu nieopłacenia albo spóźnienia składki? | `przerwy_skladkowe[]` | jw. | uwzględnia się wtedy także miesiące sprzed przerwy (art. 48a ust. 4) | 🏛 |
-| Q5 | Czy w okresie obliczeniowym były miesiące, w których przez zasiłki prowadziłaś działalność krócej niż pół miesiąca? | `miesiace_niepelne[]` | jw. | wyłączenie z podstawy (art. 50) | 🏛 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| Q1 | Zadeklarowana podstawa składki chorobowej za każdy z ostatnich 12 miesięcy | `podstawa_deklarowana[]` | rodzic | fakt | B1 ∋ działalność | średnia minus 13,71%; limit maksymalnej podstawy (parametr) | zus_konto, upload:Z-3b (archiwalny), upload:poswiadczenie, kreator (tryb uproszczony `Q1s`) |
+| Q2 | Rodzaj składek: standardowe / preferencyjne / mały ZUS+ / dobrowolnie wyższa podstawa | `rodzaj_skladek` | rodzic | fakt | jw. | „najniższa podstawa” we wzorze art. 48a (ust. 5) | zus_konto, kreator |
+| Q3 | Liczba pełnych miesięcy ubezpieczenia chorobowego z tytułu działalności | `miesiace_ubezpieczenia` | rodzic | **wyliczone** (z B5) / zus | jw. | poniżej 12 → wzór art. 48a: najniższa podstawa + (nadwyżka ÷ 12) × liczba miesięcy | wyliczone, zus_konto |
+| Q4 | Czy były przerwy w ubezpieczeniu z powodu nieopłacenia albo spóźnienia składki? | `przerwy_skladkowe[]` | rodzic | fakt | jw. | uwzględnia się wtedy także miesiące sprzed przerwy (art. 48a ust. 4) | zus_konto, kreator |
+| Q5 | Czy w okresie obliczeniowym były miesiące, w których przez zasiłki prowadziłaś działalność krócej niż pół miesiąca? | `miesiace_niepelne[]` | rodzic | fakt / wyliczone z zus_historia | jw. | wyłączenie z podstawy (art. 50) | zus_historia, kreator |
 
 Zadłużenie: pytanie B8.
 
 ## R. Kwota końcowa
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| R1 | Czy masz prawo do zasiłku macierzyńskiego z więcej niż jednego tytułu? Kwoty z pozostałych tytułów; który płatnik ma wypłacić podwyższenie? | `inne_zasilki_mac[]` | zawsze przy zasiłku macierzyńskim | podwyższenie do kwoty świadczenia rodzicielskiego, gdy łączna kwota jest niższa; proporcjonalnie za część miesiąca (art. 31 ust. 3a–3c, art. 62 ust. 4–6) | 👤 📄 oświadczenie |
-| R2 | (opcjonalnie) Czy płatnik pomniejsza zaliczkę na PIT (złożony PIT-2, stawka)? | `pit{}` | gdy pokazujemy kwotę netto | Poradnik porównuje z kwotą świadczenia rodzicielskiego zasiłek pomniejszony o zaliczkę na PIT | 👤 |
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| R1 | Czy masz prawo do zasiłku macierzyńskiego z więcej niż jednego tytułu? Kwoty z pozostałych tytułów; który płatnik ma wypłacić podwyższenie? | `inne_zasilki_mac[]` | rodzic | fakt | zawsze przy zasiłku macierzyńskim | podwyższenie do kwoty świadczenia rodzicielskiego, gdy łączna kwota jest niższa; proporcjonalnie za część miesiąca (art. 31 ust. 3a–3c, art. 62 ust. 4–6) | zus_konto, upload:oswiadczenie, kreator |
+| R2 | (opcjonalnie) Czy płatnik pomniejsza zaliczkę na PIT (PIT-2, stawka)? | `pit{}` | rodzic | fakt | gdy pokazujemy kwotę netto | Poradnik porównuje z kwotą świadczenia rodzicielskiego zasiłek pomniejszony o zaliczkę na PIT | kreator |
 
-## S. Ryzyka (ostrzeżenia, nie automatyczna odmowa – wymaganie h)
+## S. Ryzyka (ostrzeżenia i status `warunkowo`, nie automatyczna odmowa – wymaganie h)
 
-| ID | Pytanie | Pole | Pokaż, gdy | Ostrzeżenie | Źródło |
-|---|---|---|---|---|---|
-| S1 | Kiedy zawarto umowę, otwarto działalność albo zgłoszono się do dobrowolnego ubezpieczenia chorobowego? | `data_zgloszenia` | zawsze | zgłoszenie w ciąży lub tuż przed nią → ZUS może badać pozorność umowy | 🏛 📄 |
-| S2 | Czy w czasie ciąży podwyższono wynagrodzenie albo deklarowaną podstawę składek? Kiedy i o ile? | `podwyzka_w_ciazy{}` | zawsze | ZUS może ustalić niższą podstawę | 👤 🏛 |
-| S3 | Czy przed porodem planujesz rozwiązać umowę, zamknąć lub zawiesić działalność, zakończyć zlecenie albo wyrejestrować się z dobrowolnego ubezpieczenia chorobowego? | `plan_ustania{}` | A1 ∋ ciąża | brak ubezpieczenia w dniu porodu = brak zasiłku macierzyńskiego (poza wyjątkami z sekcji F) | 👤 |
-| S4 | Czy opłacasz składki terminowo? | `terminowosc_skladek` | B1 ∋ działalność | zadłużenie i przerwy w ubezpieczeniu (B8, Q4) | 🏛 |
-| S5 | Praca w czasie zwolnienia | pytanie D6 | D1 niepuste | utrata zasiłku | 👤 |
+Każde ryzyko ma kod w `content/ryzyka` (API: `Ryzyko.kod`). Flaga `dotyczy_ciebie` jest liczona z pól poniżej.
 
-## T. Zasiłek opiekuńczy (zgodnie z listą świadczeń; poza punktami a–j treści wyzwania)
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Ostrzeżenie (kod ryzyka) | Źródła |
+|---|---|---|---|---|---|---|---|
+| S1 | Kiedy zawarto umowę, otwarto działalność albo zgłoszono się do dobrowolnego ubezpieczenia chorobowego? | `data_zgloszenia` | rodzic | fakt | zawsze | zgłoszenie w ciąży lub tuż przed nią → ZUS może badać pozorność (`umowa_dla_pozoru`) | zus_konto, upload:Z-3, kreator |
+| S2 | Czy w czasie ciąży podwyższono wynagrodzenie albo deklarowaną podstawę składek? Kiedy i o ile? | `podwyzka_w_ciazy{}` | rodzic | fakt (wyliczane też z O4 / Q1 i `pdp`) | zawsze | ZUS może ustalić niższą podstawę (`podwyzszenie_podstawy_w_ciazy`) | zus_konto, upload:Z-3, kreator |
+| S3 | Czy przed porodem planujesz rozwiązać umowę, zamknąć lub zawiesić działalność, zakończyć zlecenie albo wyrejestrować się z dobrowolnego ubezpieczenia chorobowego? | `plan_ustania{}` | rodzic | **plan** | A1 ∋ ciąża | brak ubezpieczenia w dniu porodu = brak zasiłku macierzyńskiego, poza wyjątkami z F (`brak_ubezpieczenia_w_dniu_porodu`); wchodzi do B7 | kreator |
+| S4 | Czy opłacasz składki terminowo? | `terminowosc_skladek` | rodzic | fakt | B1 ∋ działalność | zadłużenie i przerwy w ubezpieczeniu (`zadluzenie_skladkowe`; B8, Q4) | zus_platnik, kreator |
+| S5 | Praca w czasie zwolnienia | pytanie D6 | rodzic | fakt | D1 niepuste | utrata zasiłku (`praca_na_zwolnieniu`) | kreator |
+| S6 | Czy w czasie ciąży zmieniono warunki zatrudnienia (etat, rodzaj umowy, pracodawcę)? | `zmiana_warunkow_w_ciazy{}` | rodzic | fakt / wyliczone z B2, O7 | A1 ∋ ciąża | wpływ na prawo i wysokość zasiłku (`zmiana_warunkow_zatrudnienia`) | zus_konto, upload:Z-3, kreator |
 
-| ID | Pytanie | Pole | Pokaż, gdy | Po co | Źródło |
-|---|---|---|---|---|---|
-| T1 | Nad kim sprawujesz opiekę? (zdrowe dziecko do 8 lat: nieprzewidziane zamknięcie żłobka, przedszkola lub szkoły [zawiadomienie mniej niż 7 dni wcześniej], choroba niani lub dziennego opiekuna, poród lub choroba drugiego rodzica stale opiekującego się dzieckiem, jego pobyt w szpitalu, izolacja dziecka / chore dziecko do 14 lat / dziecko z niepełnosprawnością do 18 lat / inny chory członek rodziny) | `opieka_typ` | A1 ∋ opieka | rodzaj i limit dni (Poradnik) | 👤 📄 |
-| T2 | Data urodzenia dziecka albo stopień pokrewieństwa | `podopieczny{}` | A1 ∋ opieka | progi 8, 14 i 18 lat; członek rodziny musi mieszkać we wspólnym gospodarstwie | 👤 |
-| T3 | Czy jest domownik, który może zapewnić opiekę? | `inny_domownik` | A1 ∋ opieka | „tak” = brak zasiłku, chyba że chore dziecko ma mniej niż 2 lata; lista osób, które nie są takim domownikiem (Poradnik) | 👤 |
-| T4 | Ile dni zasiłku opiekuńczego w tym roku pobrałeś(-aś) Ty, drugi rodzic lub małżonek, inny członek rodziny? | `dni_opiekuncze_rok{}` | A1 ∋ opieka | limity: 60 dni (dzieci do 14 lat) / 30 (chore dziecko z niepełnosprawnością 14–18) / 14 (pozostali), łącznie najwyżej 60 dni w roku (zał. 7 pkt 6) | 👤 🏛 |
-| T5 | Okres opieki (e-ZLA albo oświadczenie) | `opieka_od_do` | A1 ∋ opieka | okres wypłaty | 🏛 📄 |
-| T6 | Czy dziecko ma orzeczenie o znacznym stopniu niepełnosprawności (albo ze wskazaniami)? | `orzeczenie_niepelnosprawnosci` | T1 ∋ niepełnosprawność | wyższy limit wieku | 📄 |
+## T. Zasiłek opiekuńczy – poza zakresem pierwszej wersji
 
-Reguły: 80% podstawy; bez okresu wyczekiwania; dotyczy go zadłużenie z B8. W dostarczonym wyciągu ustawy brakuje art. 32–35, więc reguły pochodzą z Poradnika.
+Nie ma go w punktach a–j treści wyzwania ani w `docs/opis_aplikacji.md`. Pytania zostają jako zapas
+(`sytuacja` ∋ opieka): wyłączony moduł w panelu admina, dopóki mentorzy nie potwierdzą, że jest oczekiwany.
+
+| ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
+|---|---|---|---|---|---|---|---|
+| T1 | Nad kim sprawujesz opiekę? (zdrowe dziecko do 8 lat: nieprzewidziane zamknięcie żłobka, przedszkola lub szkoły [zawiadomienie mniej niż 7 dni wcześniej], choroba niani lub dziennego opiekuna, poród lub choroba drugiego rodzica stale opiekującego się dzieckiem, jego pobyt w szpitalu, izolacja dziecka / chore dziecko do 14 lat / dziecko z niepełnosprawnością do 18 lat / inny chory członek rodziny) | `opieka_typ` | rodzic | fakt | A1 ∋ opieka | rodzaj i limit dni (Poradnik) | kreator, ezla |
+| T2 | Data urodzenia dziecka albo stopień pokrewieństwa | `podopieczny{}` | rodzic | fakt | A1 ∋ opieka | progi 8, 14 i 18 lat; członek rodziny we wspólnym gospodarstwie | kreator, rsc |
+| T3 | Czy jest domownik, który może zapewnić opiekę? | `inny_domownik` | rodzic | fakt | A1 ∋ opieka | „tak” = brak zasiłku, chyba że chore dziecko ma mniej niż 2 lata | kreator |
+| T4 | Ile dni zasiłku opiekuńczego w tym roku pobrałeś(-aś) Ty, drugi rodzic lub małżonek, inny członek rodziny? | `dni_opiekuncze_rok{}` | rodzic | fakt | A1 ∋ opieka | limity 60 / 30 / 14 dni, łącznie najwyżej 60 dni w roku (zał. 7 pkt 6) | zus_historia, kreator |
+| T5 | Okres opieki (e-ZLA albo oświadczenie) | `opieka_od_do` | rodzic | fakt | A1 ∋ opieka | okres wypłaty | ezla, kreator |
+| T6 | Czy dziecko ma orzeczenie o znacznym stopniu niepełnosprawności (albo ze wskazaniami)? | `orzeczenie_niepelnosprawnosci` | dziecko | fakt | T1 ∋ niepełnosprawność | wyższy limit wieku | upload:orzeczenie, kreator |
+
+Reguły: 80% podstawy; bez okresu wyczekiwania; dotyczy go zadłużenie z B8. Wyciąg ustawy nie zawiera art. 32–35,
+więc reguły pochodzą z Poradnika.
 
 ---
 
-## Macierz: świadczenie → potrzebne pytania
+## U. Pola wyliczane (bez pytań)
+
+| Pole | Osoba | Z czego | Używane w |
+|---|---|---|---|
+| `wiek` | rodzic, dziecko | `data_urodzenia` + data odniesienia | D3 (33/14 dni), limity wieku dziecka |
+| `okres_wyczekiwania_spelniony` | rodzic | B5, B6, `chorobowe_dobrowolne`, data prawa | zasiłek chorobowy |
+| `ubezpieczony_w_dniu_zdarzenia` | rodzic | B3, B5, S3, F, data zdarzenia (`data_porodu` / `pdp` / `data_przyjecia`) | B7, status `warunkowo` |
+| `kto_wyplaca[tytul]` | rodzic | C1, B1, D4 | C2, poradnik, `gdzie_zlozyc` |
+| `data_prawa` | rodzic | D1 / G2 / N2 | O1, wersja parametrów |
+| `dni_okresu_zasilkowego` | rodzic | D1, D2, zus_historia | E1, limit 270 dni |
+| `okres_wyczerpany` | rodzic | `dni_okresu_zasilkowego` | E1 |
+| `dzieci_zyjace` | rodzic (matka) | I1, I2 osób `dziecko` | I3, wymiar urlopu |
+| `liczba_przyjetych` | rodzic | osoby `dziecko` z `data_przyjecia` | N6 |
+| `rodz_w_1_roku` | rodzic | `wybory.podzial_rodzicielskiego`, `data_urodzenia` dziecka | J3 |
+| `miesiace_ubezpieczenia` | rodzic | B5 | Q3, P4 |
+
+## V. Wybory scenariusza (`Scenariusz.wybory`)
+
+Nie są polami osoby. Kreator ich nie zadaje – ustawia je użytkownik w kalkulatorze. Klucze jak w `docs/api.md` (3.7).
+
+| Klucz | Pytanie źródłowe | Typ | Walidacja (z parametrów) |
+|---|---|---|---|
+| `wniosek_81_5` | J2 | tak / nie | możliwe tylko, gdy data wniosku ≤ 21 dni od porodu / przyjęcia |
+| `start_urlopu_macierzynskiego` | J1 | data | najwcześniej 6 tyg. przed `pdp` |
+| `przejecie_macierzynskiego_przez` | J4, K2–K5 | `{osoba_id, od}` | po 14 tyg. (sytuacje szczególne – po 8 tyg.) |
+| `uzupelniajacy_kto` | H4 | `osoba_id` | jeden rodzic, bezpośrednio po macierzyńskim |
+| `podzial_rodzicielskiego` | L1, L3, L4 | lista `{osoba_id, od, tygodnie, praca_wymiar, praca_wymiar_wydluzenia}` | pula, 9 tyg. nieprzenoszalnych, max 5 części, termin 6. urodzin, `praca_wymiar` ≤ ½ |
+| `urlop_ojcowski` | M1 | lista `{osoba_id, od, dni}` | 14 dni, max 2 części ≥ 7 dni, do 12 mies. życia |
+
+Jeśli dokument pokazuje, że urlop **już udzielono** (Z-3 pkt 6–7, ZAM), wartości trafiają do pól faktów
+(`macierzynski_od`, `laczenie_praca[]`, `rodzicielski_wykorzystany`), a scenariusz domyślny jest z nich budowany.
+
+---
+
+## W. Dokumenty → pola (dla odczytu skanów)
+
+| Typ dokumentu | Wystawca | Pola |
+|---|---|---|
+| **ZAS-53** – wniosek o zasiłek chorobowy | uzytkownik | `ezla[]` (okresy), `po_ustaniu{}` („po ustaniu tytułu”), `sytuacja` |
+| **ZAM** (i archiwalne **ZUR**, **ZAO**) – wniosek o zasiłek macierzyński | uzytkownik | `rola`, `data_porodu`, `liczba_dzieci`, `za_zyciem`, `wariant`, `wniosek_81_5_data`, `rodzicielski_czesci[]`, `ojcowski_czesci[]`, dane dziecka |
+| **Z-3** – zaświadczenie płatnika (pracownik); może być „pierwszorazowy” i kilka „w kontynuacji” | pracodawca | `tytuly` (umowa o pracę), `zatrudnienie_od`, `etat`, `umowa_rodzaj`, `urlop_bez_zasilku`, `dni_wynagr_chorobowego_rok`, okresy zasiłków, udzielone urlopy (`macierzynski_od`, `laczenie_praca[]`), `miesiace[]`, `premie_kwartalne[]`, `premie_roczne`, `umowy_u_pracodawcy[]`, `platnik_ponad_20` |
+| **Z-3a** – zaświadczenie płatnika (zleceniobiorca) | pracodawca | `tytuly` (zlecenie), `przychod_miesiace[]`, `ciaglosc_zlecen`, `platnik_ponad_20` |
+| **Z-3b** (archiwalny) – działalność | pracodawca / uzytkownik | `podstawa_deklarowana[]` |
+| **ZAS-12** – płatnik, dalszy okres | pracodawca | `ezla[]` (kolejne okresy), wypłacone świadczenia |
+| **Poświadczenie ubezpieczenia chorobowego** (wewnętrzny ZUS) | zus | `tytuly`, `chorobowe`, `chorobowe_od`, `okresy_wczesniejsze`, `podstawa_deklarowana[]` / podstawy składek |
+| **Zrzut z systemu ZUS** | zus | okresy ubezpieczenia, tytuły (kod tytułu), przyznane świadczenia (`poprzedni_zasilek`, `rodzicielski_wykorzystany`) |
+| **Akt urodzenia / zgonu** | urzad | dziecko: `data_urodzenia`, `martwe_urodzenie`, `data_zgonu`; `data_porodu`, `liczba_dzieci` |
+| **Zaświadczenie lekarskie** (przewidywana data porodu, ciąża) | lekarz | `pdp`, `ciaza_w_zatrudnieniu` |
+| **Karta informacyjna szpitala** | lekarz | dziecko: `tydzien_ciazy`, `masa_g`, `hospitalizacje[]`; `matka_szpital[]` |
+| **Zaświadczenie „Za życiem”** | lekarz | dziecko: `za_zyciem` |
+| **Postanowienie / zaświadczenie sądu, umowa ze starostą** | sad / urzad | `forma_przyjecia`, `data_przyjecia`, `data_wniosku_sad`, `przysposobienie_prawomocne`, `umieszczenie_data` |
+| **Wyrok sądu, świadectwo pracy** | sad / pracodawca | `ustanie_data`, `ustanie_przyczyna` |
+| **Orzeczenie o niezdolności do samodzielnej egzystencji** | urzad | `matka_nse` |
+| **Pismo ZUS** (np. „brakuje Z-3”) | zus | **żadnych pól** – informacja dla użytkownika (lista braków) |
+| **Decyzja / wynik sprawy** | zus | **żadnych pól** – tylko `Sprawa.oczekiwany_wynik` (rozpoznawana po treści, nie po pozycji) |
+
+---
+
+## X. Macierz: świadczenie → potrzebne pytania
+
+Reguła zwraca `brak_danych`, gdy brakuje aktywnej wartości któregokolwiek pola z kolumny „Warunki prawa” (dla statusu)
+albo „Okres” / „Kwota” (dla wyliczeń – wtedy status prawa jest znany, a kwota oznaczona jako brakująca).
 
 | Świadczenie | Warunki prawa | Okres | Kwota |
 |---|---|---|---|
-| Zasiłek chorobowy w ciąży | A1, B1, B4–B6, B8, B10–B11, D1, D4–D6 | D1–D3, A4 | C1, O/P/Q (100%) |
+| Zasiłek chorobowy w ciąży | A1, B1, B4–B6, B8, B10–B11, D1, D4–D6 | D1–D3, A4 | C2, O/P/Q (100%) |
 | Świadczenie rehabilitacyjne | E1–E2, B10 | E3 | O/P/Q, E3–E4 |
 | Zasiłek w wysokości zasiłku macierzyńskiego | F1–F4, B3 | F1 → G1/G2 | O (100%) |
-| Urlop macierzyński | A2, B1 (umowa o pracę), G1–G3, G5 | J1, J4, I1–I3, K2–K5 | – |
-| Zasiłek macierzyński za okres urlopu macierzyńskiego | A2, B4, B7, B8, F (wyjątki), K | G2, G3, J1, J4, G5, K7 | J2, O/P/Q, R1 |
+| Urlop macierzyński | A2, B1 (umowa o pracę), G1–G3, G5 | V: start, przejęcie; I1–I3, K2–K5 | – |
+| Zasiłek macierzyński za okres urlopu macierzyńskiego | A2, B4, B7, B8, F (wyjątki), K | G2, G3, G5, K7; V: start, przejęcie | V: `wniosek_81_5`, O/P/Q, R1 |
 | Zasiłek przy martwym urodzeniu lub zgonie dziecka | I1, B4, B7 | I1–I3, G2 | O/P/Q (100%) |
-| Uzupełniający urlop macierzyński i zasiłek | H1–H5, B4 | H1–H3 | O/P/Q (100%) |
-| Urlop rodzicielski i zasiłek | B1/B4, K1, A3 | G3, G4, L1–L4, J3 | J2, J3, L3, O/P/Q, R1 |
-| Urlop ojcowski i zasiłek | A2, B4/B7, M2 | M1, M3, G2 | O/P/Q (100%) |
-| Urlop na warunkach urlopu macierzyńskiego i zasiłek | N1–N3, B4, B7 | N4–N7 | J2, O/P/Q |
-| Urlop rodzicielski przy przyjęciu dziecka | N1–N5 | N4, N6, N7, G4, L1–L4 | J2, O/P/Q |
-| Zasiłek opiekuńczy | T1–T3, B4, B8 | T4–T5 | O/P/Q (80%) |
+| Uzupełniający urlop macierzyński i zasiłek | H1–H3, H5, B4 | H1–H3; V: `uzupelniajacy_kto` | O/P/Q (100%) |
+| Urlop rodzicielski i zasiłek | B1/B4, K1, A3 | G3, G4, L2; V: `podzial_rodzicielskiego` | V: `wniosek_81_5`, J3, O/P/Q, R1 |
+| Urlop ojcowski i zasiłek | A2, B4/B7, M2 | M3, G2; V: `urlop_ojcowski` | O/P/Q (100%) |
+| Urlop na warunkach urlopu macierzyńskiego i zasiłek | N1–N3, B4, B7 | N4–N7 | V: `wniosek_81_5`, O/P/Q |
+| Urlop rodzicielski przy przyjęciu dziecka | N1–N5 | N4, N6, N7, G4; V: `podzial_rodzicielskiego` | V: `wniosek_81_5`, O/P/Q |
+| Zasiłek opiekuńczy (moduł wyłączony) | T1–T3, B4, B8 | T4–T5 | O/P/Q (80%) |
 
 ---
 
-## Parametry do panelu administracyjnego (stałe, nie pytania)
+## Y. Parametry do panelu administracyjnego (`params/`, stałe, nie pytania)
+
+Każda wersja ma `obowiazuje_od`. Do wyliczeń bierzemy wersję obowiązującą w dniu `data_prawa`.
 
 | Parametr | Wartość z materiałów |
 |---|---|
@@ -259,6 +362,8 @@ Reguły: 80% podstawy; bez okresu wyczekiwania; dotyczy go zadłużenie z B8. W 
 | Martwe urodzenie lub zgon | 8 tyg.; co najmniej 7 dni od zgonu |
 | Stawki | 100% / 70% / 81,5%; chorobowy 80% (w ciąży 100%); rehabilitacyjne 90% → 75% (w ciąży 100%); opiekuńczy 80% |
 | Termin wniosku o 81,5% | 21 dni |
+| Start urlopu przed porodem | maks. 6 tyg. |
+| Przejęcie urlopu przez ojca | po 14 tyg. (sytuacje szczególne – po 8 tyg.) |
 | Okres wyczekiwania | 30 dni (obowiązkowe) / 90 dni (dobrowolne); wliczana przerwa do 30 dni |
 | Okres zasiłkowy | 182 dni / 270 dni (ciąża); przerwa 60 dni; po ustaniu 91 dni (nie w ciąży) |
 | Wynagrodzenie chorobowe | 33 dni / 14 dni (50+) |
@@ -273,15 +378,22 @@ Reguły: 80% podstawy; bez okresu wyczekiwania; dotyczy go zadłużenie z B8. W 
 | Opiekuńczy – limity | 60 / 30 / 14 dni; łącznie 60 dni w roku |
 | Zasiłek pogrzebowy (informacja) | 7 000 zł |
 | Tydzień urlopu / miesiąc zasiłku | 7 dni kalendarzowych / 30 dni (stawka dzienna = 1/30) |
+| Próg pewności odczytu AI | 0,6 (poniżej → `do_sprawdzenia`, niższy priorytet w hierarchii) |
+
+Parametry z poprzednich lat (np. minimalne wynagrodzenie 2025 dla spraw testowych z 2025 r.) dodajemy jako osobne
+wersje z wcześniejszym `obowiazuje_od`, bo sprawy ZUS dotyczą różnych lat.
 
 ---
 
-## Do wyjaśnienia z mentorami ZUS
+## Z. Do wyjaśnienia z mentorami ZUS
+
+Pytania o prawo i wyliczenia. Pytania o demo i zakres: `docs/opis_aplikacji.md`, rozdz. 15.
 
 1. **Art. 183 §3 i §4 pkt 3 KP:** kiedy dokładnie przysługuje 9 tyg. urlopu na warunkach urlopu macierzyńskiego i 38 tyg. rodzicielskiego przy przyjęciu dziecka? Czy wtedy, gdy limit wieku skróciłby urlop poniżej 9 tyg.?
 2. **Kwota świadczenia rodzicielskiego w 2026 r.** i to, czy porównujemy z nią zasiłek brutto, czy po zaliczce na PIT (Poradnik mówi o kwocie po PIT).
 3. **Tabela minimalnej podstawy 2026** jest pusta w załączniku ZUS; wyliczyliśmy 4 147,10 zł. Brakuje też najniższych podstaw dla działalności (standardowej i preferencyjnej) na 2026 r.
 4. **Wariant 81,5% przy urlopie zaczętym przed porodem:** jak rozliczyć 100% wypłacone przed porodem?
-5. **Zasiłek opiekuńczy:** wyciąg ustawy nie zawiera art. 32–35. Czy reguły z Poradnika wystarczą? Czy w ogóle oczekujecie go w kalkulatorze?
+5. **Zasiłek opiekuńczy:** wyciąg ustawy nie zawiera art. 32–35. Czy w ogóle oczekujecie go w aplikacji?
 6. **Formularze ZUR, ZAO i Z-3b** zlikwidowano od 24.10.2026, ale występują w sprawach testowych. Aplikacja ma je tylko czytać, a nowe wnioski generować na ZAM?
 7. **Art. 9 ust. 4 i art. 17 ust. 1d–1e** wchodzą w życie 1.01.2027. Uwzględniać datę wejścia w życie jako parametr?
+8. **Parametry z lat poprzednich** (sprawy testowe z 2025 r.): czy możecie potwierdzić wartości 2025 (minimalne wynagrodzenie, limity) do wyliczeń w tych sprawach?

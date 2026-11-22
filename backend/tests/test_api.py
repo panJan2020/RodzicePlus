@@ -32,5 +32,7 @@ def test_zadluzenie_dzialalnosc_art2a():
     token = c.post("/auth/mobywatel", json={"uzytkownik": "marta"}).json()["token"]
     sid = c.post("/sprawy").json()["id"]
     c.post(f"/zus/pobierz-do-sprawy/{sid}", headers={"Authorization": token})
-    c.post(f"/sprawy/{sid}/odpowiedzi", json=[{"pole": "ubezpieczony_w_dniu_zdarzenia", "wartosc": True}])
+    # B7 zależy od A1 (sytuacja) – bez A1 byłoby zablokowane i reguła by go nie widziała.
+    c.post(f"/sprawy/{sid}/odpowiedzi", json=[{"pole": "sytuacja", "wartosc": ["urodzenie"]},
+                                              {"pole": "ubezpieczony_w_dniu_zdarzenia", "wartosc": True}])
     assert c.get(f"/sprawy/{sid}/uprawnienia").json()[0]["status"] == "nie_przysluguje"

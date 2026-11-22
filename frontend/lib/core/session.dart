@@ -28,6 +28,11 @@ class SesjaAplikacji extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Serwer nie zna już tej sprawy (np. po restarcie) – przy następnym użyciu założymy nową.
+  void zapomnijSprawe() {
+    _sprawaId = null;
+  }
+
   void wyczysc() {
     if (_dane == null && _sprawaId == null) return;
     _dane = null;

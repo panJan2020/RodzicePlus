@@ -7,6 +7,7 @@ from app.calculator import podstawa as pw
 from app.calculator import timeline
 from app.domain.results import WynikKalkulatora, WynikUprawnienia
 from app.params.store import get_params
+from app.questions import engine
 from app.rules import eligibility
 from app.storage import memory
 
@@ -26,11 +27,11 @@ def kalkulator(sprawa_id: str, osoba: int = 0) -> WynikKalkulatora:
     s = memory.pobierz(sprawa_id)
     if not s:
         raise HTTPException(404, "Nie ma takiej sprawy")
-    o = s.osoby[osoba]
+    o = engine.aktywne_pola(s.osoby[osoba])  # bez odpowiedzi na pytania wykluczone
 
     data_str = o.get("data_porodu") or o.get("pdp")
     if not data_str:
-        raise HTTPException(422, "Brak daty porodu (pola: data_porodu albo pdp)")
+        raise HTTPException(422, "Aby policzyć zasiłek, podaj datę porodu albo przewidywaną datę porodu (pytania G1, G2).")
     data_porodu = date.fromisoformat(data_str)
     p = get_params(data_porodu)
 
@@ -42,7 +43,7 @@ def kalkulator(sprawa_id: str, osoba: int = 0) -> WynikKalkulatora:
     elif o.get("podstawa_deklarowana_srednia"):
         podstawa = pw.podstawa_dobrowolne([float(o.get("podstawa_deklarowana_srednia"))], p)
     else:
-        raise HTTPException(422, "Brak danych do podstawy wymiaru (sekcje O/P/Q)")
+        raise HTTPException(422, "Aby policzyć kwotę, podaj średnie wynagrodzenie albo podstawę składek (pytania O4s, Q1s).")
 
     okresy = timeline.plan_matki(
         data_porodu=data_porodu, liczba_dzieci=int(o.get("liczba_dzieci", 1)),

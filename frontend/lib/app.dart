@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -53,6 +54,10 @@ class _AppState extends State<App> {
         debugShowCheckedModeBanner: false,
         theme: zbudujMotyw(),
         routerConfig: _router,
+        // Polski kalendarz i teksty systemowe (np. wybór daty).
+        locale: const Locale('pl'),
+        supportedLocales: const [Locale('pl')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
       ),
     );
   }

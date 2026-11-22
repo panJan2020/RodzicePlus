@@ -12,6 +12,7 @@ class Kolory {
   static const tekstDrugorzedny = Color(0xFF4A4A4A);
   static const ramka = Color(0xFFDADDDC);
   static const blad = Color(0xFFC8102E); // „nie przysługuje”
+  static const bladTlo = Color(0xFFFDECEE);
   static const ostrzezenie = Color(0xFFB35C00); // „brak danych”, do sprawdzenia
   static const ostrzezenieTlo = Color(0xFFFFF4E5);
 }

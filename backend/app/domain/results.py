@@ -11,12 +11,19 @@ class Status(str, Enum):
     BRAK_DANYCH = "brak_danych"
 
 
+class BrakujacePytanie(BaseModel):
+    id: str                          # ID pytania z katalogu, np. "B5" (link do zakładki Dane)
+    tresc: str
+    gdzie_znalezc: str | None = None # np. "zaświadczenie Z-3, pkt 11"
+
+
 class WynikUprawnienia(BaseModel):
     swiadczenie: str                 # np. "zasilek_macierzynski"
     status: Status
     uzasadnienie: list[str] = Field(default_factory=list)   # zdania dla użytkownika
     podstawa_prawna: list[str] = Field(default_factory=list)
-    brakujace_pola: list[str] = Field(default_factory=list)  # ID pól do uzupełnienia
+    brakujace_pola: list[str] = Field(default_factory=list)  # ID pytań do uzupełnienia, np. ["A1", "B7"]
+    brakujace_pytania: list[BrakujacePytanie] = Field(default_factory=list)  # to samo z treścią – do UI
     ostrzezenia: list[str] = Field(default_factory=list)     # ryzyka (FR-22)
     kto_wyplaca: str | None = None   # "pracodawca" / "ZUS" (FR-20)
 

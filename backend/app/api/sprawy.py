@@ -16,7 +16,7 @@ router = APIRouter(prefix="/sprawy", tags=["sprawy"])
 def _sprawa(sprawa_id: str) -> Sprawa:
     s = memory.pobierz(sprawa_id)
     if not s:
-        raise HTTPException(404, "Nie ma takiej sprawy")
+        raise HTTPException(404, "Nie ma takiej sprawy.")
     return s
 
 
@@ -40,16 +40,33 @@ def pobierz(sprawa_id: str) -> Sprawa:
 def zapisz_odpowiedzi(sprawa_id: str, odpowiedzi: list[Odpowiedz]) -> Sprawa:
     s = _sprawa(sprawa_id)
     for o in odpowiedzi:
-        s.osoby[o.osoba].pola[o.pole] = FieldValue(wartosc=o.wartosc, zrodlo=Zrodlo.UZYTKOWNIK,
+        pola = _osoba(s, o.osoba).pola
+        if o.wartosc is None:  # „Wyczyść odpowiedź”
+            pola.pop(o.pole, None)
+            continue
+        pola[o.pole] = FieldValue(wartosc=o.wartosc, zrodlo=Zrodlo.UZYTKOWNIK,
                                                    potwierdzone=True)
     memory.zapisz(s)
     return s
 
 
+def _osoba(s: Sprawa, osoba: int):
+    if not 0 <= osoba < len(s.osoby):
+        raise HTTPException(404, "W tej sprawie nie ma takiej osoby.")
+    return s.osoby[osoba]
+
+
 @router.get("/{sprawa_id}/pytania")
 def nastepne_pytania(sprawa_id: str, osoba: int = 0) -> list[dict]:
-    """Pytania do zadania teraz: widoczne według warunków i jeszcze bez odpowiedzi."""
-    return engine.nastepne_pytania(_sprawa(sprawa_id).osoby[osoba])
+    """Dla kreatora: pytania aktywne (warunki spełnione) i jeszcze bez odpowiedzi."""
+    return engine.nastepne_pytania(_osoba(_sprawa(sprawa_id), osoba))
+
+
+@router.get("/{sprawa_id}/dane", response_model=engine.DaneOsoby)
+def dane(sprawa_id: str, osoba: int = 0) -> engine.DaneOsoby:
+    """Zakładka „Dane”: całe drzewo pytań ze stanem (aktywne / zablokowane / wykluczone),
+    aktualną wartością i jej źródłem. Edycja przez POST /odpowiedzi."""
+    return engine.dane_osoby(_osoba(_sprawa(sprawa_id), osoba), osoba)
 
 
 def _przetworz(zid: str, sprawa_id: str, pdf: bytes) -> None:
