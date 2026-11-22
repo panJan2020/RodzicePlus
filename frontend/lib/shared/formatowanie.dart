@@ -73,6 +73,20 @@ String _opisJednej(PytanieDrzewa p, Object? w) {
         final kod = e['kod'] == null ? '' : ' (kod ${e['kod']})';
         return '$zakres$kod';
       }).join('\n');
+    case TypPytania.miesiace:
+      if (w is! List || w.isEmpty) return 'Brak';
+      return w.map((e) {
+        if (e is! Map) return '$e';
+        final zmienne = num.tryParse('${e['skladniki_zmienne']}') ?? 0;
+        final kwota = zmienne == 0
+            ? formatujKwote(e['skladniki_stale'] ?? '0')
+            : '${formatujKwote(e['skladniki_stale'] ?? '0')} + ${formatujKwote(e['skladniki_zmienne'])}';
+        final dni = (e['dni_obowiazujace'] ?? 0) == 0 ? '' : ' (${e['dni_przepracowane']} z ${e['dni_obowiazujace']} dni)';
+        return '${e['miesiac']}: $kwota$dni';
+      }).join('\n');
+    case TypPytania.zasilek:
+      if (w is! Map) return 'Brak';
+      return 'Do ${formatujDateIso('${w['data_do']}')}, podstawa ${formatujKwote(w['podstawa'] ?? '0')}';
   }
 }
 

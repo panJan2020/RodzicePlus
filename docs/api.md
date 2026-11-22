@@ -195,7 +195,10 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
 // Pytanie (element DaneOsoby i odpowiedź /pytania)
 {"id": "G1", "sekcja": "G", "pole": "pdp",
  "tresc": "Kiedy planowany jest poród?",
- "typ": "data",                   // wybor | wielokrotny | tak_nie | liczba | kwota | data | okresy
+ "typ": "data",                   // wybor | wielokrotny | tak_nie | liczba | kwota | data | okresy | miesiace | zasilek
+                                  // tylko podgląd: okresy [{od, do, ...}], miesiace (O4) [{miesiac, skladniki_stale,
+                                  // skladniki_zmienne, dni_przepracowane, dni_obowiazujace, stale_pelna_kwota}],
+                                  // zasilek (O2) {data_do, podstawa}
  "opcje": [],                     // dla wybor / wielokrotny: [{"wartosc": "...", "etykieta": "..."}]
  "pomoc": "…", "gdzie_znalezc": "zaświadczenie lekarskie o przewidywanej dacie porodu",
  "rodzaj": "fakt",                // fakt | plan (plany tylko od użytkownika) | wyliczone

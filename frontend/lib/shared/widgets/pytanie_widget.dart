@@ -54,7 +54,7 @@ class _PytanieWidgetState extends State<PytanieWidget> {
         ], wielokrotny: true),
       TypPytania.liczba || TypPytania.kwota => _pole(p),
       TypPytania.data => _data(context),
-      TypPytania.okresy => Text(opisWartosci(p), style: Theme.of(context).textTheme.bodyLarge),
+      TypPytania.okresy || TypPytania.miesiace || TypPytania.zasilek => Text(opisWartosci(p), style: Theme.of(context).textTheme.bodyLarge),
     };
   }
 

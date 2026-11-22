@@ -289,7 +289,9 @@ enum TypPytania {
   liczba('liczba'),
   kwota('kwota'),
   data('data'),
-  okresy('okresy');
+  okresy('okresy'), // tylko podgląd
+  miesiace('miesiace'), // tylko podgląd: wynagrodzenia z Z-3 (O4)
+  zasilek('zasilek'); // tylko podgląd: poprzedni zasiłek (O2)
 
   const TypPytania(this.json);
   final String json;

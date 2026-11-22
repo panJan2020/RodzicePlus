@@ -39,16 +39,19 @@ def tool_definition() -> dict[str, Any]:
                         "pewnosc": {"type": "number", "minimum": 0, "maximum": 1}},
                         "required": ["pole", "wartosc", "dokument", "strona", "pewnosc"]},
                 },
-                # Dane do kalkulatora podstawy wymiaru (Z-3 pkt 16 / Z-3b) – lista miesięcy.
+                # Pole O4 `miesiace[]` (Z-3, „Składniki wynagrodzenia”) – dane do podstawy wymiaru (art. 36–38).
                 "wynagrodzenia_miesieczne": {
                     "type": "array",
                     "items": {"type": "object", "properties": {
                         "miesiac": {"type": "string", "description": "RRRR-MM"},
-                        "kwota_brutto": {"type": "number"},
+                        "skladniki_stale": {"type": "number", "description": "składniki stałe brutto w kwocie wypłaconej"},
+                        "skladniki_zmienne": {"type": "number", "description": "składniki zmienne brutto"},
                         "dni_przepracowane": {"type": "integer"},
-                        "dni_obowiazujace": {"type": "integer"},
+                        "dni_obowiazujace": {"type": "integer", "description": "dni, które trzeba było przepracować"},
+                        "stale_pelna_kwota": {"type": "number",
+                                              "description": "pełna miesięczna kwota składników stałych z umowy"},
                         "strona": {"type": "integer"}},
-                        "required": ["miesiac", "kwota_brutto"]},
+                        "required": ["miesiac", "skladniki_stale"]},
                 },
                 "oczekiwany_wynik": {"type": "string"},
                 "uwagi": {"type": "string", "description": "co było nieczytelne lub niejasne"},

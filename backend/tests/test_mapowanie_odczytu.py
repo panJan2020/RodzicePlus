@@ -40,3 +40,14 @@ def test_plan_z_dokumentu_pomijany():
     mapowanie.zapisz_odczyt(s, {"pola": [
         {"pole": "drugi_rodzic_aktywny", "wartosc": "tak", "dokument": "ZAM", "strona": 1, "pewnosc": 0.9}]}, "x.pdf")
     assert "drugi_rodzic_aktywny" not in s.osoby[0].pola
+
+
+def test_miesiace_z_z3_w_ksztalcie_pola_o4_art38():
+    s = _sprawa()
+    mapowanie.zapisz_odczyt(s, {"pola": [], "wynagrodzenia_miesieczne": [
+        {"miesiac": "2026-05", "skladniki_stale": 6000, "skladniki_zmienne": 512.5, "dni_przepracowane": 20,
+         "dni_obowiazujace": 20, "strona": 3}]}, "x.pdf")
+    w = s.osoby[0].aktywna("miesiace")
+    assert w.wystawca == Wystawca.PRACODAWCA
+    assert w.wartosc == [{"miesiac": "2026-05", "skladniki_stale": "6000.00", "skladniki_zmienne": "512.50",
+                          "dni_przepracowane": 20, "dni_obowiazujace": 20, "stale_pelna_kwota": None}]

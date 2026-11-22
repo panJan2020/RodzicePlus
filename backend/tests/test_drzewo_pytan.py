@@ -286,3 +286,16 @@ def test_kreator_pyta_tylko_o_aktywne_bez_odpowiedzi():
     ids = [p["id"] for p in c.get(f"/sprawy/{sid}/pytania").json()]
     assert "A1" not in ids and "G2" in ids
     assert "G4" in [p["id"] for p in c.get(f"/sprawy/{sid}/pytania?osoba=o2").json()]
+
+
+def test_plan_ustania_s3_tylko_w_ciazy_i_data_po_tak_art29():
+    sid = _nowa()
+    _odpowiedz(sid, sytuacja=["ciaza"], tytuly=["umowa_o_prace"])
+    ids = [p["id"] for p in c.get(f"/sprawy/{sid}/pytania").json()]
+    assert "S3" in ids and "S3a" not in ids
+    _odpowiedz(sid, plan_ustania=True)
+    assert "S3a" in [p["id"] for p in c.get(f"/sprawy/{sid}/pytania").json()]
+    q = _pytania_api(sid)
+    assert q["S3"]["rodzaj"] == "plan"
+    assert q["O4"]["typ"] == "miesiace" and q["O4"]["edytowalne"] is False  # O4 tylko podgląd (Z-3)
+    assert q["O2"]["typ"] == "zasilek" and q["O2"]["edytowalne"] is False
