@@ -1,33 +1,54 @@
-"""Kwoty zasiłku: stawka miesięczna, dzienna (1/30), za okres, podwyższenie do świadczenia rodzicielskiego."""
+"""Kwoty zasiłku: stawka dzienna (1/30), kwota za okres, kwota miesięczna, podwyższenie do świadczenia rodzicielskiego.
+
+Zaokrąglenia jak w ZUS: stawka dzienna do groszy, potem × liczba dni (art. 11 ust. 4 – zasiłek za każdy dzień).
+Kwota miesięczna to informacja dla użytkownika (podstawa × stawka), pokazywana w groszach.
+"""
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
 from app.calculator.podstawa import zl
 
 
-def miesieczny(podstawa: Decimal, stawka: float) -> Decimal:
+def miesieczny(podstawa: Decimal, stawka: float | Decimal) -> Decimal:
     return zl(podstawa * Decimal(str(stawka)))
 
 
-def dzienny(podstawa: Decimal, stawka: float, p: dict[str, Any]) -> Decimal:
+def dzienny(podstawa: Decimal, stawka: float | Decimal, p: dict[str, Any]) -> Decimal:
+    """Art. 36 ust. 3 (stosowany do zasiłku macierzyńskiego): 1/30 kwoty miesięcznej, zaokrąglona do groszy."""
     return zl(podstawa * Decimal(str(stawka)) / p["dzielnik_dzienny"])
 
 
-def za_okres(podstawa: Decimal, stawka: float, dni: int, p: dict[str, Any]) -> Decimal:
-    """Zasiłek przysługuje za każdy dzień, także wolny (art. 11 ust. 4).
-
-    UWAGA: ZUS liczy stawkę dzienną zaokrągloną do groszy × liczba dni.
-    Sprawdźcie na sprawach testowych, czy wyniki zgadzają się co do grosza.
-    """
-    return zl(dzienny(podstawa, stawka, p) * dni)
+def za_okres(podstawa: Decimal, stawka: float | Decimal, dni: int, p: dict[str, Any]) -> Decimal:
+    """Stawka dzienna (już w groszach) × liczba dni – bez dodatkowego zaokrąglania."""
+    return dzienny(podstawa, stawka, p) * dni
 
 
 def z_podwyzszeniem(kwota_miesieczna: Decimal, p: dict[str, Any]) -> tuple[Decimal, bool]:
     """Art. 31 ust. 3a: podwyższenie do kwoty świadczenia rodzicielskiego.
 
-    TODO (pytanie do mentorów): porównujemy kwotę brutto czy po zaliczce PIT (Poradnik mówi: po PIT).
+    DO POTWIERDZENIA (docs Z.2): porównujemy kwotę brutto; Poradnik mówi o kwocie po zaliczce na PIT.
     """
-    minimum = Decimal(str(p["swiadczenie_rodzicielskie"]))
+    minimum = zl(p["swiadczenie_rodzicielskie"])
     if kwota_miesieczna < minimum:
         return minimum, True
     return kwota_miesieczna, False
+
+
+def za_okres_podwyzszony(od: date, do: date, p: dict[str, Any]) -> Decimal:
+    """Art. 31 ust. 3c: kwota świadczenia rodzicielskiego za każdy pełny miesiąc kalendarzowy,
+    za niepełny – proporcjonalnie (kwota × dni / dni w tym miesiącu, w groszach).
+
+    DO POTWIERDZENIA: sposób liczenia niepełnego miesiąca – sprawdzić na decyzjach ZUS.
+    """
+    kwota = zl(p["swiadczenie_rodzicielskie"])
+    suma, dzien = Decimal(0), od
+    while dzien <= do:
+        dni_w_miesiacu = monthrange(dzien.year, dzien.month)[1]
+        koniec_miesiaca = dzien.replace(day=dni_w_miesiacu)
+        ostatni = min(koniec_miesiaca, do)
+        dni = (ostatni - dzien).days + 1
+        suma += kwota if dni == dni_w_miesiacu else zl(kwota * dni / dni_w_miesiacu)
+        dzien = ostatni + timedelta(days=1)
+    return suma

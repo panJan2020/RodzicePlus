@@ -1,8 +1,8 @@
 """Oś czasu okresów zasiłku.
 
-Wersja startowa: matka, urlop macierzyński + rodzicielski, wariant 81,5% albo 100/70,
-opcjonalnie 9 tygodni drugiego rodzica na końcu. TODO: łączenie z pracą (L3), części,
-ojcowski, przyjęcie dziecka, sytuacje szczególne (sekcje H, I, K).
+Wersja startowa: matka, urlop macierzyński + jej część urlopu rodzicielskiego (bez 9 tygodni drugiego rodzica),
+wariant 81,5% albo 100% / 70%. Okres zaczyna się w dniu powstania prawa (start urlopu albo poród).
+TODO (etap 4): drugi rodzic, łączenie z pracą (L3), części, ojcowski, przyjęcie dziecka, sytuacje szczególne.
 """
 from datetime import date, timedelta
 from decimal import Decimal
@@ -11,6 +11,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.calculator import kwoty, wymiary
+
+UWAGA_PODWYZSZENIE = ("Podwyższono do kwoty świadczenia rodzicielskiego (art. 31 ust. 3a ustawy zasiłkowej). "
+                      "Sposób liczenia za niepełny miesiąc – do potwierdzenia w ZUS.")
 
 
 def stawka_tekst(stawka: float | str | Decimal) -> str:
@@ -26,44 +29,52 @@ class Okres(BaseModel):
     do: date
     tygodnie: int
     stawka: str
-    kwota_miesieczna: str
-    kwota_za_okres: str
+    stawka_dzienna: str | None = None    # None – nie znamy podstawy wymiaru
+    kwota_miesieczna: str | None = None
+    kwota_za_okres: str | None = None
+    podwyzszone: bool = False
     uwagi: list[str] = Field(default_factory=list)
 
 
+class PlanMatki(BaseModel):
+    okresy: list[Okres]
+    powrot_do_pracy: date           # pierwszy dzień po ostatnim okresie
+    ostrzezenia: list[str] = Field(default_factory=list)
+
+
 def _okres(rodzaj: str, osoba: str, od: date, tygodnie: int, stawka: float,
-           podstawa: Decimal, p: dict[str, Any]) -> tuple[Okres, date]:
+           podstawa: Decimal | None, p: dict[str, Any]) -> Okres:
     dni = tygodnie * 7
     do = od + timedelta(days=dni - 1)
-    mies = kwoty.miesieczny(podstawa, stawka)
-    mies, podwyzszone = kwoty.z_podwyzszeniem(mies, p)
-    uwagi = ["Podwyższono do kwoty świadczenia rodzicielskiego (art. 31 ust. 3a ustawy zasiłkowej)"] if podwyzszone else []
-    # TODO: przy podwyższeniu kwota za okres liczona proporcjonalnie do miesięcy (art. 31 ust. 3c)
-    okres = Okres(rodzaj=rodzaj, osoba=osoba, od=od, do=do, tygodnie=tygodnie, stawka=stawka_tekst(stawka),
-                  kwota_miesieczna=str(mies), kwota_za_okres=str(kwoty.za_okres(podstawa, stawka, dni, p)), uwagi=uwagi)
-    return okres, do + timedelta(days=1)
+    okres = Okres(rodzaj=rodzaj, osoba=osoba, od=od, do=do, tygodnie=tygodnie, stawka=stawka_tekst(stawka))
+    if podstawa is None:
+        return okres
+    mies, podwyzszone = kwoty.z_podwyzszeniem(kwoty.miesieczny(podstawa, stawka), p)
+    if podwyzszone:
+        okres.podwyzszone = True
+        okres.uwagi.append(UWAGA_PODWYZSZENIE)
+        okres.kwota_za_okres = str(kwoty.za_okres_podwyzszony(od, do, p))
+        okres.stawka_dzienna = str(kwoty.zl(mies / p["dzielnik_dzienny"]))
+    else:
+        okres.kwota_za_okres = str(kwoty.za_okres(podstawa, stawka, dni, p))
+        okres.stawka_dzienna = str(kwoty.dzienny(podstawa, stawka, p))
+    okres.kwota_miesieczna = str(mies)
+    return okres
 
 
-def plan_matki(data_porodu: date, liczba_dzieci: int, za_zyciem: bool, wniosek_81_5: bool,
-               podstawa: Decimal, p: dict[str, Any], drugi_rodzic_bierze_9_tyg: bool = False) -> list[Okres]:
+def plan_matki(start: date, liczba_dzieci: int, za_zyciem: bool, wniosek_81_5: bool,
+               podstawa: Decimal | None, p: dict[str, Any]) -> PlanMatki:
+    """Urlop macierzyński od `start` (dzień powstania prawa), zaraz po nim część rodzicielskiego matki."""
     s = p["stawki"]
-    okresy: list[Okres] = []
-
     tyg_mac = wymiary.urlop_macierzynski_tyg(liczba_dzieci, p)
     tyg_rodz = wymiary.urlop_rodzicielski_tyg(liczba_dzieci, za_zyciem, p)
     tyg_drugi = p["rodzicielski_nieprzenoszalne_tyg"]
-    tyg_rodz_matki = tyg_rodz - tyg_drugi  # 9 tyg. drugiego rodzica nie przechodzi na matkę
 
-    o, nastepny = _okres("macierzynski", "matka", data_porodu, tyg_mac,
-                         s["jednolita"] if wniosek_81_5 else s["macierzynski"], podstawa, p)
-    okresy.append(o)
-    o, nastepny = _okres("rodzicielski", "matka", nastepny, tyg_rodz_matki,
-                         s["jednolita"] if wniosek_81_5 else s["rodzicielski"], podstawa, p)
-    okresy.append(o)
-    if drugi_rodzic_bierze_9_tyg:
-        # Podstawa drugiego rodzica jest inna – tu tylko szkic osi czasu.
-        o, _ = _okres("rodzicielski", "ojciec", nastepny, tyg_drugi,
-                      s["nieprzenoszalna_drugi_rodzic"], podstawa, p)
-        o.uwagi.append("Kwota orientacyjna – policz z podstawą wymiaru drugiego rodzica")
-        okresy.append(o)
-    return okresy
+    mac = _okres("macierzynski", "matka", start, tyg_mac,
+                 s["jednolita"] if wniosek_81_5 else s["macierzynski"], podstawa, p)
+    # 9 tygodni urlopu rodzicielskiego drugiego rodzica nie przechodzi na matkę (art. 182^1a § 1 KP)
+    rodz = _okres("rodzicielski", "matka", mac.do + timedelta(days=1), tyg_rodz - tyg_drugi,
+                  s["jednolita"] if wniosek_81_5 else s["rodzicielski"], podstawa, p)
+    ostrzezenia = [f"{tyg_drugi} tygodni urlopu rodzicielskiego przysługuje wyłącznie drugiemu rodzicowi – "
+                   f"zasiłek za nie zawsze wynosi {int(Decimal(str(s['nieprzenoszalna_drugi_rodzic'])) * 100)}%."]
+    return PlanMatki(okresy=[mac, rodz], powrot_do_pracy=rodz.do + timedelta(days=1), ostrzezenia=ostrzezenia)

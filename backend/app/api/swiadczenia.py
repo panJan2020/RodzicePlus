@@ -15,7 +15,7 @@ from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulator
                                 WynikSwiadczenia)
 from app.params.store import get_params
 from app.questions import engine
-from app.rules import eligibility
+from app.rules import eligibility, wyliczone
 
 router = APIRouter(prefix="/sprawy/{sprawa_id}", tags=["świadczenia i kalkulator"])
 
@@ -62,27 +62,23 @@ def kalkulator(sprawa_id: str, osoba: str | None = None,
     f = engine.fakty(s, matka)
     dziecko = next((o for o in s.osoby if o.rola == Rola.DZIECKO), None)
     fd = engine.fakty(s, dziecko) if dziecko else {}
-    wnioskodawca = engine.fakty(s, s.wnioskodawca())
 
-    data_porodu = scenariusz.data_zdarzenia(f)
-    if data_porodu is None:
+    start = wyliczone.data_prawa(f)
+    if start is None:
         raise HTTPException(422, "Aby policzyć zasiłek, podaj datę porodu albo przewidywaną datę porodu "
                                  "(pytania G1, G2).")
-    p = get_params(data_porodu)
-    podstawa = _podstawa(f, data_porodu, p)
+    p = get_params(start)
+    podstawa = _podstawa(f, start, p)
     wybory = scenariusz.domyslny(f, p)
 
-    okresy = timeline.plan_matki(
-        data_porodu=data_porodu, liczba_dzieci=int(f.get("liczba_dzieci") or 1),
-        za_zyciem=bool(fd.get("za_zyciem", False)), wniosek_81_5=wybory["wniosek_81_5"],
-        podstawa=podstawa, p=p, drugi_rodzic_bierze_9_tyg=wnioskodawca.get("drugi_rodzic_aktywny") == "tak")
-    drugi = next((o for o in s.osoby if o.rola in (Rola.OJCIEC, Rola.DRUGI_RODZIC) and o is not matka), None)
-    wynik_okresy = [OkresKalkulatora(**o.model_dump(exclude={"osoba"}),
-                                     osoba_id=matka.id if o.osoba == "matka" else (drugi.id if drugi else None))
-                    for o in okresy]
-    suma_matki = sum((Decimal(o.kwota_za_okres) for o in okresy if o.osoba == "matka"), Decimal("0"))
+    plan = timeline.plan_matki(start=start, liczba_dzieci=int(f.get("liczba_dzieci") or 1),
+                               za_zyciem=bool(fd.get("za_zyciem", False)), wniosek_81_5=wybory["wniosek_81_5"],
+                               podstawa=podstawa, p=p)
+    okresy = plan.okresy
+    wynik_okresy = [OkresKalkulatora(**o.model_dump(include=set(OkresKalkulatora.model_fields) - {"osoba_id"}),
+                                     osoba_id=matka.id) for o in okresy]
     suma = sum((Decimal(o.kwota_za_okres) for o in okresy), Decimal("0"))
     return WynikKalkulatora(scenariusz_id=scenariusz.SCENARIUSZ_DOMYSLNY, wersja_parametrow=p["obowiazuje_od"],
                             osoby=[OsobaKalkulatora(osoba_id=matka.id, podstawa_wymiaru=str(podstawa),
-                                                    suma=str(suma_matki))],
+                                                    suma=str(suma))],
                             okresy=wynik_okresy, suma=str(suma))

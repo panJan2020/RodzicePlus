@@ -1,5 +1,5 @@
 """Testy reguł liczbowych. Każda reguła prawna = co najmniej jeden test z przepisem w nazwie."""
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -53,11 +53,45 @@ def test_podwyzszenie_do_swiadczenia_rodzicielskiego_art31_3a():
     assert kwota == Decimal("1000.00") and podw
 
 
-def test_plan_matki_81_5_pomija_9_tyg_drugiego_rodzica():
-    okresy = timeline.plan_matki(date(2026, 3, 2), 1, False, True, Decimal("6000"), P)
-    assert [o.rodzaj for o in okresy] == ["macierzynski", "rodzicielski"]
-    assert (okresy[1].do - okresy[0].od).days + 1 == (20 + 32) * 7
-    assert all(o.stawka == "0.815" for o in okresy)
+def test_rodzicielski_matki_bez_9_tyg_drugiego_rodzica_art182_1a():
+    plan = timeline.plan_matki(date(2026, 3, 2), 1, False, True, Decimal("6000"), P)
+    assert [o.rodzaj for o in plan.okresy] == ["macierzynski", "rodzicielski"]
+    assert [o.tygodnie for o in plan.okresy] == [20, 32]
+    assert plan.powrot_do_pracy == date(2026, 3, 2) + timedelta(weeks=20 + 32)
+    assert "wyłącznie drugiemu rodzicowi" in plan.ostrzezenia[0] and "70%" in plan.ostrzezenia[0]
+
+
+@pytest.mark.parametrize("dzieci,za_zyciem,tyg", [(1, False, 32), (2, False, 34), (1, True, 56), (2, True, 58)])
+def test_rodzicielski_za_zyciem_i_dzieci_art182_1a(dzieci, za_zyciem, tyg):
+    assert timeline.plan_matki(date(2026, 3, 2), dzieci, za_zyciem, False, None, P).okresy[1].tygodnie == tyg
+
+
+def test_stawki_100_70_art31():
+    o = timeline.plan_matki(date(2026, 3, 2), 1, False, False, Decimal("6000.00"), P).okresy
+    assert [x.stawka for x in o] == ["1.00", "0.70"]
+    assert o[0].kwota_miesieczna == "6000.00" and o[1].kwota_miesieczna == "4200.00"
+
+
+def test_81_5_za_caly_okres_art31_ust3():
+    o = timeline.plan_matki(date(2026, 3, 2), 1, False, True, Decimal("6000.00"), P).okresy
+    assert {x.stawka for x in o} == {"0.815"} and o[0].kwota_miesieczna == "4890.00"
+
+
+def test_kwoty_co_do_grosza_art36():
+    # Podstawa 7075,78 zł (8200 zł brutto − 13,71%).
+    # Macierzyński 100%: stawka dzienna 7075,78 / 30 = 235,859… → 235,86 zł; 20 tyg. = 140 dni × 235,86 = 33 020,40 zł
+    # Rodzicielski 70%: 7075,78 × 0,7 = 4953,046 → miesięcznie 4953,05 zł; dziennie 4953,046 / 30 = 165,1015… → 165,10 zł;
+    #                   32 tyg. = 224 dni × 165,10 = 36 982,40 zł
+    o = timeline.plan_matki(date(2026, 7, 10), 1, False, False, Decimal("7075.78"), P).okresy
+    assert (o[0].stawka_dzienna, o[0].kwota_za_okres) == ("235.86", "33020.40")
+    assert (o[1].kwota_miesieczna, o[1].stawka_dzienna, o[1].kwota_za_okres) == ("4953.05", "165.10", "36982.40")
+
+
+def test_podwyzszenie_za_okres_art31_ust3c():
+    # 1000 zł za pełny miesiąc, za niepełny proporcjonalnie: 15.01–31.03.2026 → 17/31 × 1000 + 1000 + 1000
+    assert kwoty.za_okres_podwyzszony(date(2026, 1, 15), date(2026, 3, 31), P) == Decimal("2548.39")
+    o = timeline.plan_matki(date(2026, 1, 15), 1, False, False, Decimal("1000.00"), P).okresy[1]  # 70% = 700 zł
+    assert o.podwyzszone and o.kwota_miesieczna == "1000.00" and "do potwierdzenia" in o.uwagi[0]
 
 
 @pytest.mark.parametrize("stawka,tekst", [(1.0, "1.00"), (0.7, "0.70"), (0.815, "0.815")])
