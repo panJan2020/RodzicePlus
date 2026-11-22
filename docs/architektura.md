@@ -186,7 +186,14 @@ POST /sprawy/{id}/dokumenty (PDF, wiele plików)
 
 1. **Hierarchia wiarygodności** (domyślny wybór aktywnej wartości):
    `zus / urzad` > `sad` > `pracodawca / lekarz` > odczyt AI z `pewnosc < 0,6` > `uzytkownik`.
-   Wyjątek: pola typu „plan / zamiar” – tylko `uzytkownik`.
+   Wyjątek: pola typu „plan / zamiar” – tylko `uzytkownik`; pola „wybór” nie trafiają do osób (scenariusz).
+   - Odczyt AI z `pewnosc ≥ 0,6` ma rangę swojego wystawcy (np. Z-3 → `pracodawca`). Odczyt poniżej progu
+     spada na poziom „niepewny odczyt AI”, ale nigdy nie awansuje ponad swojego wystawcę. Próg: parametr `prog_pewnosci_ai`.
+   - **Remis** (ta sama ranga): wyższa `pewnosc`, potem nowsza wartość (`utworzono`).
+   - **Wyjątek przy wystawcy `uzytkownik`:** wartość z dokumentu (`kanal: upload`, np. ZAM) wygrywa z kreatorem,
+     bo to ona trafiła do ZUS.
+   - To samo źródło (ten sam kanał i dokument) podające nową wartość aktualizuje **swoją** wartość, nie dodaje kolejnej.
+   - Kod: `backend/app/merge/hierarchia.py` (kolejność), `merge/scalanie.py` (zapis, wybór aktywnej, konflikty).
 2. **Konflikt** = to samo pole tej samej osoby ma różne wartości. System od razu wybiera aktywną według hierarchii,
    więc wynik nie jest blokowany. Użytkownik może zmienić wybór w „Konfliktach” albo w „Moich danych”.
    Niewybrane wartości zostają zapisane.

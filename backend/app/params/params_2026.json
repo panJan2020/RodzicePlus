@@ -56,5 +56,6 @@
   "wyczekiwanie_dni": {"obowiazkowe": 30, "dobrowolne": 90},
   "okres_zasilkowy_dni": {"standard": 182, "ciaza": 270, "po_ustaniu": 91},
   "wynagrodzenie_chorobowe_dni": {"standard": 33, "po_50": 14},
-  "dzielnik_dzienny": 30
+  "dzielnik_dzienny": 30,
+  "prog_pewnosci_ai": 0.6
 }
