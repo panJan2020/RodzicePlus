@@ -32,21 +32,29 @@ class Responsive {
 }
 
 /// Pozycja menu głównego (dolny pasek na telefonie, boczny na tablecie/komputerze).
+/// `naTelefonie: false` – na telefonie pozycja jest w „Więcej” (dolny pasek ma najwyżej 5 pozycji).
 class PozycjaMenu {
-  const PozycjaMenu(this.etykieta, this.ikona, this.ikonaAktywna, this.sciezka);
+  const PozycjaMenu(this.etykieta, this.ikona, this.ikonaAktywna, this.sciezka, {this.naTelefonie = true});
   final String etykieta;
   final IconData ikona;
   final IconData ikonaAktywna;
   final String sciezka;
+  final bool naTelefonie;
 }
 
 const pozycjeMenu = <PozycjaMenu>[
   PozycjaMenu('Start', Icons.home_outlined, Icons.home, '/'),
-  PozycjaMenu('Ubezpieczenie', Icons.health_and_safety_outlined, Icons.health_and_safety, '/ubezpieczenie'),
+  PozycjaMenu('Ubezpieczenie', Icons.health_and_safety_outlined, Icons.health_and_safety, '/ubezpieczenie',
+      naTelefonie: false),
   PozycjaMenu('Moje dane', Icons.fact_check_outlined, Icons.fact_check, '/dane'),
+  PozycjaMenu('Świadczenia', Icons.verified_outlined, Icons.verified, '/swiadczenia'),
   PozycjaMenu('Kalkulator', Icons.calculate_outlined, Icons.calculate, '/kalkulator'),
-  PozycjaMenu('Moje konto', Icons.person_outline, Icons.person, '/konto'),
+  PozycjaMenu('Moje konto', Icons.person_outline, Icons.person, '/konto', naTelefonie: false),
 ];
+
+/// Pozycje dolnego paska telefonu (bez „Więcej”) i pozycje schowane w „Więcej”.
+final pozycjeTelefonu = [for (final p in pozycjeMenu) if (p.naTelefonie) p];
+final pozycjeWiecej = [for (final p in pozycjeMenu) if (!p.naTelefonie) p];
 
 /// Indeks aktywnej pozycji menu dla bieżącej ścieżki.
 int indeksMenu(String sciezka) {

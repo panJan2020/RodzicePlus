@@ -30,6 +30,8 @@ void main() {
     await uruchomAplikacje(tester, const Size(375, 800));
     expect(find.byType(NavigationBar), findsOneWidget);
 
+    await tester.tap(find.text('Więcej')); // „Moje konto” nie mieści się w dolnym pasku
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Moje konto'));
     await tester.pumpAndSettle();
     await zalogujJako(tester, 'Anna Testowa');

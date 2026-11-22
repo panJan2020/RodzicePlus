@@ -55,14 +55,14 @@ void main() {
     expect(find.text('Odpowiedz najpierw na:'), findsNothing); // G2 już aktywne
   });
 
-  testWidgets('telefon: akordeon i „Uzupełnij” z kalkulatora otwiera właściwe pytanie', (tester) async {
+  testWidgets('telefon: akordeon i „Uzupełnij” ze świadczeń otwiera właściwe pytanie', (tester) async {
     await uruchomAplikacje(tester, const Size(375, 812));
-    await tester.tap(find.text('Kalkulator'));
+    await tester.tap(find.text('Świadczenia'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Brakuje danych'));
     expect(find.text('Brakuje danych'), findsOneWidget);
     expect(find.text('Na jakiej podstawie pracujesz? (B1)'), findsOneWidget);
-    expect(find.textContaining('podaj datę porodu'), findsOneWidget); // 422 z kalkulatora
 
     await tester.ensureVisible(find.text('Uzupełnij'));
     await tester.tap(find.text('Uzupełnij'));

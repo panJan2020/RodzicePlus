@@ -10,8 +10,8 @@ import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import 'kalkulator_viewmodel.dart';
 
-/// „Kalkulator” – czy świadczenie przysługuje (z uzasadnieniem) i ile wynosi.
-/// Komputer: dwie kolumny (świadczenia | okresy i kwoty); telefon: jedna pod drugą.
+/// „Kalkulator” – okresy urlopów i kwoty zasiłku (czy przysługuje – ekran „Świadczenia”).
+/// Komputer: dwie kolumny (podsumowanie | okresy i kwoty); telefon: jedna pod drugą.
 class KalkulatorView extends StatelessWidget {
   const KalkulatorView({super.key});
 
@@ -33,31 +33,28 @@ class _Tresc extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return TrescStrony(
       children: [
-        Semantics(header: true, child: Text('Twoje świadczenia', style: t.headlineMedium)),
+        Semantics(header: true, child: Text('Kalkulator zasiłku', style: t.headlineMedium)),
         const SizedBox(height: 8),
-        Text('Wynik liczymy na podstawie Twoich danych z zakładki „Moje dane”.', style: t.bodyLarge),
-        const SizedBox(height: 24),
+        Text('Okresy urlopów i kwoty zasiłku liczymy z Twoich danych z zakładki „Moje dane”.', style: t.bodyLarge),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => context.go('/swiadczenia'),
+            icon: const Icon(Icons.fact_check_outlined),
+            label: const Text('Czy zasiłek Ci przysługuje? Zobacz „Świadczenia”'),
+          ),
+        ),
+        const SizedBox(height: 16),
         StanLadowania(
           laduje: vm.laduje,
           blad: vm.blad,
           onPonow: vm.zaladuj,
           tresc: (_) {
-            final lewa = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(header: true, child: Text('Czy Ci przysługuje', style: t.titleLarge)),
-                const SizedBox(height: 12),
-                for (final u in vm.swiadczenia) ...[_KartaSwiadczenia(wynik: u), const SizedBox(height: 12)],
-              ],
-            );
-            final prawa = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(header: true, child: Text('Okresy i kwoty', style: t.titleLarge)),
-                const SizedBox(height: 12),
-                if (vm.wynik != null) _Kwoty(wynik: vm.wynik!) else _BrakKwot(komunikat: vm.bladKalkulatora),
-              ],
-            );
+            final w = vm.wynik;
+            if (w == null) return _BrakKwot(komunikat: vm.bladKalkulatora);
+            final lewa = _Podsumowanie(wynik: w);
+            final prawa = _Okresy(wynik: w);
             if (Responsive.uklad(context) == Uklad.komputer) {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,118 +75,29 @@ class _Tresc extends StatelessWidget {
 String _nazwaOkresu(String s) => switch (s) {
       'macierzynski' => 'Urlop macierzyński',
       'rodzicielski' => 'Urlop rodzicielski',
-      'rodzicielski_9_tyg' => 'Urlop rodzicielski – 9 tygodni drugiego rodzica',
       'ojcowski' => 'Urlop ojcowski',
       _ => s.replaceAll('_', ' '),
     };
 
-class _KartaSwiadczenia extends StatelessWidget {
-  const _KartaSwiadczenia({required this.wynik});
-  final WynikSwiadczenia wynik;
+class _Uwaga extends StatelessWidget {
+  const _Uwaga(this.tekst);
+  final String tekst;
 
   @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    final w = wynik;
-    final (kolor, tlo, ikona, napis) = switch (w.status) {
-      StatusSwiadczenia.przysluguje => (Kolory.primary, Kolory.primaryLight, Icons.check_circle, 'Przysługuje'),
-      StatusSwiadczenia.warunkowo => (Kolory.secondary, Kolory.tlo, Icons.schedule, 'Przysługuje warunkowo'),
-      StatusSwiadczenia.niePrzysluguje => (Kolory.blad, Kolory.bladTlo, Icons.cancel, 'Nie przysługuje'),
-      StatusSwiadczenia.brakDanych => (Kolory.ostrzezenie, Kolory.ostrzezenieTlo, Icons.help, 'Brakuje danych'),
-    };
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(border: Border(left: BorderSide(color: kolor, width: 4))),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(w.nazwa, style: t.titleMedium),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: tlo, borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(ikona, color: kolor, size: 18, semanticLabel: napis),
-                  const SizedBox(width: 6),
-                  Text(napis, style: TextStyle(color: kolor, fontWeight: FontWeight.w700, fontSize: 15)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (final u in w.uzasadnienie) Text(u, style: t.bodyLarge),
-            if (w.ktoWyplacaOpis != null) ...[
-              const SizedBox(height: 8),
-              Text(w.ktoWyplacaOpis!, style: t.bodyLarge),
-            ],
-            if (w.status == StatusSwiadczenia.brakDanych && w.brakujacePola.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Brakujace(wynik: w),
-            ],
-            if (w.podstawaPrawna.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text('(${w.podstawaPrawna.join('; ')})', style: t.bodyMedium),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// „Brakuje N odpowiedzi:” + lista pytań + „Uzupełnij” → `/dane?pytanie=<pierwsze ID>`.
-class _Brakujace extends StatelessWidget {
-  const _Brakujace({required this.wynik});
-  final WynikSwiadczenia wynik;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    final braki = wynik.brakujacePola;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Brakuje odpowiedzi: ${braki.length}', style: t.titleMedium),
-        const SizedBox(height: 6),
-        for (final b in braki)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 9, right: 10, left: 4),
-                  child: Icon(Icons.circle, size: 6, color: Kolory.tekstDrugorzedny),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${b.tresc} (${b.pytanieId})', style: t.bodyLarge),
-                      if (b.gdzieZnalezc != null) Text('Znajdziesz to: ${b.gdzieZnalezc}', style: t.bodyMedium),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2, right: 8),
+            child: Icon(Icons.info_outline, size: 18, color: Kolory.secondary, semanticLabel: 'Uwaga'),
           ),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: () => context.go(Uri(path: '/dane', queryParameters: {'pytanie': braki.first.pytanieId}).toString()),
-          icon: const Icon(Icons.edit),
-          label: const Text('Uzupełnij'),
-        ),
-      ],
-    );
-  }
+          Expanded(child: Text(tekst, style: Theme.of(context).textTheme.bodyLarge)),
+        ]),
+      );
 }
 
-class _Kwoty extends StatelessWidget {
-  const _Kwoty({required this.wynik});
+class _Podsumowanie extends StatelessWidget {
+  const _Podsumowanie({required this.wynik});
   final WynikKalkulatora wynik;
 
   @override
@@ -199,26 +107,70 @@ class _Kwoty extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Semantics(header: true, child: Text('Podsumowanie', style: t.titleLarge)),
+        const SizedBox(height: 12),
         Card(
+          margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (wynik.orientacyjny) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Kolory.ostrzezenieTlo, borderRadius: BorderRadius.circular(12)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.info_outline, color: Kolory.ostrzezenie, size: 18, semanticLabel: 'Wynik orientacyjny'),
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text('Wynik orientacyjny',
+                            style: TextStyle(color: Kolory.ostrzezenie, fontWeight: FontWeight.w700, fontSize: 15)),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (ty != null) ...[
                   Text('Podstawa wymiaru zasiłku', style: t.bodyMedium),
                   Text(formatujKwote(ty.podstawaWymiaru), style: t.titleLarge),
+                  const SizedBox(height: 8),
                 ],
-                const SizedBox(height: 8),
                 Text('Razem za wszystkie okresy (brutto)', style: t.bodyMedium),
                 Text(formatujKwote(wynik.suma), style: t.titleLarge?.copyWith(color: Kolory.primaryDark)),
+                if (ty?.powrotDoPracy != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Powrót do pracy', style: t.bodyMedium),
+                  Text(formatujDate(ty!.powrotDoPracy!), style: t.titleLarge),
+                ],
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
+        for (final o in wynik.ostrzezenia) _Uwaga(o),
+        Text('Parametry prawne obowiązujące od ${formatujDateIso(wynik.wersjaParametrow)}', style: t.bodyMedium),
+      ],
+    );
+  }
+}
+
+class _Okresy extends StatelessWidget {
+  const _Okresy({required this.wynik});
+  final WynikKalkulatora wynik;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final ty = wynik.osoby.isEmpty ? null : wynik.osoby.first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(header: true, child: Text('Okresy i kwoty', style: t.titleLarge)),
+        const SizedBox(height: 12),
         for (final o in wynik.okresy) ...[
           Card(
+            margin: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -231,6 +183,8 @@ class _Kwoty extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text('${formatujProcent(o.stawka)} podstawy · ${formatujKwote(o.kwotaMiesieczna)} miesięcznie (brutto)',
                       style: t.bodyLarge),
+                  if (o.stawkaDzienna.isNotEmpty)
+                    Text('${formatujKwote(o.stawkaDzienna)} za każdy dzień', style: t.bodyMedium),
                   Text('Za cały okres: ${formatujKwote(o.kwotaZaOkres)} brutto',
                       style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                   for (final u in o.uwagi) Text(u, style: t.bodyMedium),
@@ -240,7 +194,6 @@ class _Kwoty extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        Text('Parametry prawne obowiązujące od ${formatujDateIso(wynik.wersjaParametrow)}', style: t.bodyMedium),
       ],
     );
   }

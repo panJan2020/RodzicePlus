@@ -15,6 +15,7 @@ class Kolory {
   static const bladTlo = Color(0xFFFDECEE);
   static const ostrzezenie = Color(0xFFB35C00); // „brak danych”, do sprawdzenia
   static const ostrzezenieTlo = Color(0xFFFFF4E5);
+  static const warunkowoTlo = Color(0xFFE8EEF5); // „warunkowo” (granat na jasnym tle), konflikt
 }
 
 const _zaokraglenie = BorderRadius.all(Radius.circular(6));

@@ -22,15 +22,19 @@ class SzkieletStrony extends StatelessWidget {
     void idz(int i) => context.go(pozycjeMenu[i].sciezka);
 
     if (uklad == Uklad.telefon) {
+      // Najwyżej 5 pozycji: główne + „Więcej” (pozostałe ekrany w arkuszu od dołu).
+      final i = pozycjeTelefonu.indexOf(pozycjeMenu[wybrany]);
       return Scaffold(
         appBar: _Naglowek(kompaktowy: true),
         body: child,
         bottomNavigationBar: NavigationBar(
-          selectedIndex: wybrany,
-          onDestinationSelected: idz,
+          selectedIndex: i >= 0 ? i : pozycjeTelefonu.length,
+          onDestinationSelected: (n) =>
+              n < pozycjeTelefonu.length ? context.go(pozycjeTelefonu[n].sciezka) : _pokazWiecej(context),
           destinations: [
-            for (final p in pozycjeMenu)
+            for (final p in pozycjeTelefonu)
               NavigationDestination(icon: Icon(p.ikona), selectedIcon: Icon(p.ikonaAktywna), label: p.etykieta),
+            const NavigationDestination(icon: Icon(Icons.menu), selectedIcon: Icon(Icons.menu_open), label: 'Więcej'),
           ],
         ),
       );
@@ -61,6 +65,31 @@ class SzkieletStrony extends StatelessWidget {
       ),
     );
   }
+}
+
+/// „Więcej” na telefonie: ekrany, które nie mieszczą się w dolnym pasku.
+void _pokazWiecej(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (arkusz) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final p in pozycjeWiecej)
+            ListTile(
+              minTileHeight: 56,
+              leading: Icon(p.ikona),
+              title: Text(p.etykieta),
+              onTap: () {
+                Navigator.of(arkusz).pop();
+                context.go(p.sciezka);
+              },
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Nagłówek: nazwa aplikacji po lewej, po prawej „Zaloguj (mObywatel)” albo imię użytkownika.

@@ -4,7 +4,7 @@ import '../../data/api_client.dart';
 import '../../data/models/modele.dart';
 import '../../data/repositories/sprawa_repository.dart';
 
-/// Ekran „Kalkulator”: świadczenia (przysługuje / nie / brak danych) i wyliczone okresy z kwotami.
+/// Ekran „Kalkulator”: okresy zasiłku z kwotami (czy świadczenie przysługuje – ekran „Świadczenia”).
 class KalkulatorViewModel extends ChangeNotifier {
   KalkulatorViewModel(this._sprawy) {
     zaladuj();
@@ -12,7 +12,6 @@ class KalkulatorViewModel extends ChangeNotifier {
 
   final SprawaRepository _sprawy;
 
-  List<WynikSwiadczenia> swiadczenia = [];
   WynikKalkulatora? wynik;
   bool laduje = false;
   String? blad;
@@ -25,17 +24,15 @@ class KalkulatorViewModel extends ChangeNotifier {
     blad = null;
     notifyListeners();
     try {
-      swiadczenia = await _sprawy.swiadczenia();
-      try {
-        wynik = await _sprawy.kalkulator();
-        bladKalkulatora = null;
-      } on ApiException catch (e) {
-        if (e.kod != 422) rethrow;
+      wynik = await _sprawy.kalkulator();
+      bladKalkulatora = null;
+    } on ApiException catch (e) {
+      if (e.kod == 422) {
         wynik = null;
         bladKalkulatora = e.komunikat;
+      } else {
+        blad = e.komunikat;
       }
-    } on ApiException catch (e) {
-      blad = e.komunikat;
     } finally {
       laduje = false;
       notifyListeners();

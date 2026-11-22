@@ -138,6 +138,55 @@ Map<String, Object?> _drzewoDziecka() => {
       ],
     };
 
+/// WynikSwiadczenia (docs/api.md 3.6): poród w przyszłości, kwota orientacyjna.
+const _wynikWarunkowo = {
+  'swiadczenie': 'zasilek_macierzynski_urlop_macierzynski',
+  'nazwa': 'Zasiłek macierzyński za okres urlopu macierzyńskiego', 'osoba_id': 'o1', 'scenariusz_id': 'domyslny',
+  'status': 'warunkowo',
+  'podsumowanie': 'Przysługuje Ci zasiłek za 20 tygodni urlopu macierzyńskiego (od 10.03.2027 do 27.07.2027), '
+      'o ile w dniu porodu nadal będziesz ubezpieczona – 7 075,78 zł miesięcznie brutto.',
+  'okres': {'od': '2027-03-10', 'do': '2027-07-27', 'tygodnie': 20},
+  'kwota': {'miesieczna': '7075.78', 'za_okres': '33020.40', 'stawka': '1.00', 'stawka_dzienna': '235.86',
+            'podstawa_wymiaru': '7075.78', 'brutto': true},
+  'kto_wyplaca': 'platnik', 'kto_wyplaca_opis': 'Zasiłek wypłaci pracodawca (art. 61 ustawy zasiłkowej).',
+  'gdzie_zlozyc': 'U pracodawcy: wniosek o zasiłek macierzyński (ZAM) złóż w kadrach.',
+  'uzasadnienie': ['W dniu 10.03.2027 podlegasz ubezpieczeniu chorobowemu.'], 'powody': [],
+  'warunki': [{'opis': 'Ubezpieczenie chorobowe w dniu porodu', 'ryzyko': 'brak_ubezpieczenia_w_dniu_porodu'}],
+  'brakujace_pola': [], 'co_zrobic': [], 'orientacyjny': true,
+  'pola_do_potwierdzenia': [{'pytanie_id': 'O4', 'tresc': 'Wynagrodzenie w kolejnych miesiącach', 'gdzie_znalezc': 'zaświadczenie Z-3'}],
+  'ryzyka': ['brak_ubezpieczenia_w_dniu_porodu'], 'uwagi': ['Kwota orientacyjna – liczona ze średniego wynagrodzenia.'],
+  'podstawa_prawna': ['art. 29 ustawy zasiłkowej'], 'wersja_parametrow': '2026-01-01',
+};
+
+const _wynikBrakDanych = {
+  'swiadczenie': 'zasilek_macierzynski_urlop_rodzicielski',
+  'nazwa': 'Zasiłek macierzyński za okres urlopu rodzicielskiego', 'osoba_id': 'o1', 'scenariusz_id': 'domyslny',
+  'status': 'brak_danych', 'podsumowanie': 'Brakuje danych, żeby ustalić, czy przysługuje Ci zasiłek.',
+  'okres': null, 'kwota': null, 'kto_wyplaca': null, 'kto_wyplaca_opis': null, 'gdzie_zlozyc': null,
+  'uzasadnienie': ['Uzupełnij dane, aby ustalić prawo do zasiłku.'], 'powody': [], 'warunki': [],
+  'brakujace_pola': [{'pytanie_id': 'B1', 'tresc': 'Na jakiej podstawie pracujesz?', 'gdzie_znalezc': null}],
+  'co_zrobic': [], 'orientacyjny': false, 'pola_do_potwierdzenia': [], 'ryzyka': [], 'uwagi': [],
+  'podstawa_prawna': ['art. 29 ustawy zasiłkowej'], 'wersja_parametrow': '2026-01-01',
+};
+
+/// WynikKalkulatora (docs/api.md 3.7).
+const _kalkulator = {
+  'scenariusz_id': 'domyslny', 'wersja_parametrow': '2026-01-01',
+  'osoby': [{'osoba_id': 'o1', 'podstawa_wymiaru': '7075.78', 'suma': '70002.80', 'powrot_do_pracy': '2027-07-09'}],
+  'okresy': [
+    {'rodzaj': 'macierzynski', 'osoba_id': 'o1', 'od': '2026-07-10', 'do': '2026-11-26', 'tygodnie': 20,
+     'stawka': '1.00', 'stawka_dzienna': '235.86', 'kwota_miesieczna': '7075.78', 'kwota_za_okres': '33020.40', 'uwagi': []},
+    {'rodzaj': 'rodzicielski', 'osoba_id': 'o1', 'od': '2026-11-27', 'do': '2027-07-08', 'tygodnie': 32,
+     'stawka': '0.70', 'stawka_dzienna': '165.10', 'kwota_miesieczna': '4953.05', 'kwota_za_okres': '36982.40', 'uwagi': []},
+  ],
+  'suma': '70002.80', 'orientacyjny': true,
+  'ostrzezenia': ['9 tygodni urlopu rodzicielskiego przysługuje wyłącznie drugiemu rodzicowi – zasiłek za nie zawsze wynosi 70%.'],
+  'bledy_wyborow': [],
+};
+
+/// true – /kalkulator zwraca wynik; false – 422 (brak daty porodu).
+var kalkulatorPoliczony = false;
+
 final fakeSerwer = MockClient((r) async {
   final p = r.url.path;
   wywolania[p] = (wywolania[p] ?? 0) + 1;
@@ -177,18 +226,12 @@ final fakeSerwer = MockClient((r) async {
         : _json({'detail': 'Nie mamy jeszcze danych o Twoim ubezpieczeniu. Pobierz je z ZUS.'}, 404);
   }
   if (p == '/sprawy/sprawa1/swiadczenia') {
-    return _json([
-      {
-        'swiadczenie': 'zasilek_macierzynski', 'nazwa': 'Zasiłek macierzyński', 'osoba_id': 'o1',
-        'status': 'brak_danych', 'uzasadnienie': ['Uzupełnij dane, aby ustalić prawo do zasiłku.'], 'powody': [],
-        'brakujace_pola': [{'pytanie_id': 'B1', 'tresc': 'Na jakiej podstawie pracujesz?', 'gdzie_znalezc': null}],
-        'kto_wyplaca': null, 'kto_wyplaca_opis': null, 'podstawa_prawna': ['art. 29 ustawy zasiłkowej'],
-        'wersja_parametrow': '2026-01-01',
-      },
-    ]);
+    return _json([_wynikWarunkowo, _wynikBrakDanych]);
   }
   if (p == '/sprawy/sprawa1/kalkulator') {
-    return _json({'detail': 'Aby policzyć zasiłek, podaj datę porodu (pytania G1, G2).'}, 422);
+    return kalkulatorPoliczony
+        ? _json(_kalkulator)
+        : _json({'detail': 'Aby policzyć zasiłek, podaj datę porodu (pytania G1, G2).'}, 422);
   }
   return _json({'detail': 'Nie znaleziono'}, 404);
 });
@@ -197,6 +240,7 @@ Future<void> uruchomAplikacje(WidgetTester tester, Size rozmiar) async {
   wywolania.clear();
   odpowiedzi.clear();
   _pobranoZus = false;
+  kalkulatorPoliczony = false;
   tester.view.physicalSize = rozmiar;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);

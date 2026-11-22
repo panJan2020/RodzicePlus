@@ -29,6 +29,8 @@ void main() {
 
   testWidgets('brak ubezpieczenia: ostrzeżenie i zakończony okres (telefon)', (tester) async {
     await uruchomAplikacje(tester, const Size(375, 800));
+    await tester.tap(find.text('Więcej')); // na telefonie „Ubezpieczenie” jest w „Więcej”
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ubezpieczenie'));
     await tester.pumpAndSettle();
     await zalogujJako(tester, 'Katarzyna Przykładowa');
