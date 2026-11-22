@@ -359,8 +359,10 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 ### Etap 1 – Model danych i najczęstsza ścieżka
 - [x] Migracja na nowy model: `WartoscPola` (lista wartości + aktywna), osoby w sprawie, `merge/` z hierarchią
   i konfliktami; adaptery `sources/` zamiast mocków; ścieżki API wg `docs/api.md`; `modele.dart`. _(22.11.2026)_
-- [ ] Reguła i kalkulator zasiłku macierzyńskiego (pracownica, 1 dziecko, 100% / 70% / 81,5%, liczba dzieci,
-  „Za życiem”) z parametrów + 4 statusy wyniku + kto wypłaca.
+- [x] Reguła i kalkulator zasiłku macierzyńskiego (pracownica, 1 dziecko, 100% / 70% / 81,5%, liczba dzieci,
+  „Za życiem”) z parametrów + 4 statusy wyniku + kto wypłaca. _(22.11.2026)_
+  (B7 wyliczane z okresów ubezpieczenia i art. 177 KP, podstawa z Z-3 / art. 43 / tryb uproszczony,
+  ekran „Świadczenia”; bez drugiego rodzica, art. 30, art. 37, art. 40 i zlecenia – kolejne etapy)
 - **Gotowe, gdy:** testy przechodzą, „Moje dane” działa na nowym modelu.
 
 ### Etap 2 – Upload end-to-end (najważniejsze dla jury)
