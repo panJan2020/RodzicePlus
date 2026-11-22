@@ -14,6 +14,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, Field
 
 from app.domain.results import Powod, Status
+from app.rules import wyliczone
 
 
 class WynikReguly(BaseModel):
@@ -43,21 +44,17 @@ def kto_wyplaca(f: dict[str, Any], p: dict[str, Any]) -> tuple[str, str]:
 def zasilek_macierzynski(f: dict[str, Any], p: dict[str, Any]) -> WynikReguly:
     w = WynikReguly(swiadczenie="zasilek_macierzynski", nazwa="Zasiłek macierzyński",
                     podstawa_prawna=["art. 29 ustawy zasiłkowej"])
-    for pole in ("tytuly", "ubezpieczony_w_dniu_zdarzenia"):
-        if f.get(pole) is None:
-            w.brakujace.append(pole)
-    tytuly = f.get("tytuly") or []
-    if any(t in tytuly for t in ("zlecenie", "dzialalnosc", "wspolpraca")) and "umowa_o_prace" not in tytuly \
-            and f.get("chorobowe_dobrowolne") is None:
-        w.brakujace.append("chorobowe_dobrowolne")
+    ub = wyliczone.ubezpieczony_w_dniu(f, wyliczone.data_zdarzenia(f), p)
+    w.brakujace += ub.brakujace
+    w.brakujace = list(dict.fromkeys(w.brakujace))
     if w.brakujace:
         w.uzasadnienie.append("Uzupełnij dane, aby ustalić prawo do zasiłku.")
         return w
 
-    if f.get("ubezpieczony_w_dniu_zdarzenia") is False:
+    if ub.wartosc is False:
         # TODO: wyjątki – art. 30 (upadłość/likwidacja/śmierć pracodawcy, wyrok, umowa przedłużona do porodu)
         w.status = Status.NIE_PRZYSLUGUJE
-        w.uzasadnienie.append("W dniu porodu (przyjęcia dziecka) nie podlegasz ubezpieczeniu chorobowemu.")
+        w.uzasadnienie += ub.uzasadnienie
         w.powody.append(Powod(pole="ubezpieczony_w_dniu_zdarzenia", wartosc="nie",
                               komunikat="Brak ubezpieczenia chorobowego w dniu porodu."))
         return w

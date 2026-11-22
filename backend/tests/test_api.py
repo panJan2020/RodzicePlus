@@ -20,7 +20,8 @@ def test_pelny_przeplyw_symulacji_art29():
     pytania = [p["pole"] for p in c.get(f"/sprawy/{sid}/pytania", headers=h).json()]
     assert "data_porodu" in pytania and "tytuly" not in pytania  # tytuly przyszły z ZUS
 
-    _odp(sid, h, data_porodu="2026-07-10", liczba_dzieci=1, ubezpieczony_w_dniu_zdarzenia=True)
+    # B7 (ubezpieczenie w dniu porodu) liczymy z okresów ubezpieczenia z ZUS – nie pytamy o nie.
+    assert _odp(sid, h, data_porodu="2026-07-10", liczba_dzieci=1).status_code == 200
     w = c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()[0]
     assert w["status"] == "przysluguje" and w["osoba_id"] == "o1" and w["kto_wyplaca"] == "platnik"
     assert "pracodawca" in w["kto_wyplaca_opis"] and w["wersja_parametrow"] == "2026-01-01"
@@ -55,8 +56,7 @@ def test_zadluzenie_dzialalnosc_art2a():
     sid = c.post("/sprawy", headers=h).json()["id"]
     for kod in ("zus_konto", "zus_platnik"):
         c.post(f"/sprawy/{sid}/zrodla/{kod}/pobierz", headers=h)
-    # B7 zależy od A1 (sytuacja) – bez A1 byłoby zablokowane i reguła by go nie widziała.
-    _odp(sid, h, sytuacja=["urodzenie"], ubezpieczony_w_dniu_zdarzenia=True)
+    _odp(sid, h, sytuacja=["urodzenie"], data_porodu="2026-07-10")
     w = c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()[0]
     assert w["status"] == "nie_przysluguje" and w["powody"][0]["pole"] == "zadluzenie_kwota"
 
@@ -65,9 +65,9 @@ def test_brakujace_pola_jako_pytania_art29():
     sid = c.post("/sprawy").json()["id"]
     w = c.get(f"/sprawy/{sid}/swiadczenia").json()[0]
     assert w["status"] == "brak_danych"
-    # B1 aktywne → "B1"; B7 zablokowane przez A1 → wskazujemy "A1".
-    assert [b["pytanie_id"] for b in w["brakujace_pola"]] == ["B1", "A1"]
-    assert w["brakujace_pola"][0] == {"pytanie_id": "B1", "tresc": "Na jakiej podstawie pracujesz?",
+    # Data porodu (G1/G2) zablokowana przez A1 → wskazujemy "A1"; B1 aktywne → "B1".
+    assert [b["pytanie_id"] for b in w["brakujace_pola"]] == ["A1", "B1"]
+    assert w["brakujace_pola"][1] == {"pytanie_id": "B1", "tresc": "Na jakiej podstawie pracujesz?",
                                       "gdzie_znalezc": None}
 
 
@@ -75,7 +75,7 @@ def test_brakujace_pola_po_odpowiedzi_na_a1_art29():
     sid = c.post("/sprawy").json()["id"]
     _odp(sid, None, sytuacja=["urodzenie"], tytuly=["zlecenie"])
     w = c.get(f"/sprawy/{sid}/swiadczenia").json()[0]
-    assert [b["pytanie_id"] for b in w["brakujace_pola"]] == ["B7", "B4a"]
+    assert [b["pytanie_id"] for b in w["brakujace_pola"]] == ["G2", "B4a"]
 
 
 def test_zadania_nowa_sciezka():

@@ -24,8 +24,10 @@ from pydantic import BaseModel, Field
 
 from app import merge
 from app.config import QUESTIONS_FILE
-from app.domain.model import ROLE_RODZICA, Kanal, Osoba, Rola, Sprawa, WartoscPola
+from app.domain.model import ROLE_RODZICA, Kanal, Osoba, Rola, Sprawa, WartoscPola, Wystawca
 from app.merge.scalanie import prog_pewnosci
+from app.params.store import get_params
+from app.rules import wyliczone
 
 
 class StatusPytania(str, Enum):
@@ -233,7 +235,29 @@ def drzewo(sprawa: Sprawa, osoba: Osoba) -> list[Pytanie]:
                       for w in wartosci],
             aktywna_wartosc_id=aktywna.id if aktywna and ma_wartosc(aktywna) else None,
             wybor_aktywnej=merge.wybor_aktywnej(osoba, q["pole"]), konflikt=merge.konflikt(osoba, q["pole"])))
+    _dodaj_wyliczone(osoba, lista)
     return lista
+
+
+ID_WYLICZONEJ = "wyliczone"
+POLE_B7 = "ubezpieczony_w_dniu_zdarzenia"
+
+
+def _dodaj_wyliczone(osoba: Osoba, lista: list[Pytanie]) -> None:
+    """Pola `wyliczone` (B7) dostają wartość policzoną z aktywnych faktów – tylko do podglądu, nie zapisujemy jej."""
+    b7 = next((p for p in lista if p.pole == POLE_B7 and p.status == StatusPytania.AKTYWNE), None)
+    if b7 is None:
+        return
+    nieaktywne = {p.pole for p in lista if p.status != StatusPytania.AKTYWNE}
+    f = {k: v for k, v in merge.aktywne_wartosci(osoba).items() if k not in nieaktywne}
+    dzien = wyliczone.data_zdarzenia(f)
+    u = wyliczone.ubezpieczony_w_dniu(f, dzien, get_params(dzien))
+    if u.wartosc is None:
+        return
+    b7.wartosci = [WartoscPolaApi(id=ID_WYLICZONEJ, wartosc=u.wartosc, wystawca=Wystawca.WYLICZONE,
+                                  kanal=Kanal.SYSTEM, zrodlo_opis="Wyliczone z dat umowy i ubezpieczenia",
+                                  aktywna=True)]
+    b7.aktywna_wartosc_id = ID_WYLICZONEJ
 
 
 # ---------- widoki drzewa ----------
