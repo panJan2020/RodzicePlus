@@ -90,9 +90,8 @@ String _opisJednej(PytanieDrzewa p, Object? w) {
   }
 }
 
-/// Aktywna odpowiedź na pytanie jako tekst (etykiety opcji, daty, kwoty; pola „na tytuł” – wiersz na tytuł).
-String opisWartosci(PytanieDrzewa p) {
-  final w = p.wartosc?.wartosc;
+/// Dowolna wartość pola (nie tylko aktywna) jako tekst: etykiety opcji, daty, kwoty; pola „na tytuł” – wiersz na tytuł.
+String opisWartosciPola(PytanieDrzewa p, Object? w) {
   if (w == null) return '';
   if (p.naTytul && w is Map) {
     String tytul(Object? k) =>
@@ -101,6 +100,9 @@ String opisWartosci(PytanieDrzewa p) {
   }
   return _opisJednej(p, w);
 }
+
+/// Aktywna odpowiedź na pytanie jako tekst.
+String opisWartosci(PytanieDrzewa p) => opisWartosciPola(p, p.wartosc?.wartosc);
 
 /// „Skąd to wiemy”: gotowy opis źródła z backendu, np. „Konto w ZUS”, „Z-3, str. 7”, „Twoja odpowiedź”.
 String opisZrodla(PytanieDrzewa p, WartoscPola w) =>

@@ -1,6 +1,8 @@
 import '../../core/session.dart';
+import '../../shared/formatowanie.dart';
 import '../api_client.dart';
 import '../models/modele.dart';
+import '../models/plik_do_wgrania.dart';
 
 /// Sprawa = profil danych (Sprawa → Osoby → Pola → wartości z różnych źródeł).
 /// „Moje dane”, „Moje ubezpieczenie” i kalkulator korzystają z tej samej, bieżącej sprawy.
@@ -88,4 +90,54 @@ class SprawaRepository {
   Future<WynikKalkulatora> kalkulator() => _wSprawie(
         (id) async => WynikKalkulatora.fromJson(await _api.get('/sprawy/$id/kalkulator') as Map<String, dynamic>),
       );
+
+  // --- Dokumenty (upload) ---------------------------------------------------------------------
+
+  /// Wgrywa pliki PDF; zwraca id zadania w tle (stan: [zadanie]).
+  Future<String> wgrajDokumenty(List<PlikDoWgrania> pliki) => _wSprawie((id) async {
+        final odp = await _api.wgraj('/sprawy/$id/dokumenty', 'pliki', pliki) as Map<String, dynamic>;
+        return odp['zadanie_id'] as String;
+      });
+
+  Future<Zadanie> zadanie(String zadanieId) async =>
+      Zadanie.fromJson(await _api.get('/zadania/$zadanieId') as Map<String, dynamic>);
+
+  Future<List<Dokument>> dokumenty() => _wSprawie((id) async {
+        final lista = await _api.get('/sprawy/$id/dokumenty') as List<dynamic>;
+        return [for (final d in lista) Dokument.fromJson(d as Map<String, dynamic>)];
+      });
+
+  /// Usuwa dokument razem z wartościami z niego odczytanymi.
+  Future<ZmianaDanych> usunDokument(String dokumentId) => _wSprawie(
+        (id) async => ZmianaDanych.fromJson(await _api.delete('/sprawy/$id/dokumenty/$dokumentId') as Map<String, dynamic>),
+      );
+
+  /// Porównanie wyniku aplikacji z decyzją ZUS; `null`, gdy sprawa nie ma decyzji ZUS (404).
+  Future<Porownanie?> porownanie() => _wSprawie((id) async {
+        try {
+          return Porownanie.fromJson(await _api.get('/sprawy/$id/porownanie') as Map<String, dynamic>);
+        } on ApiException catch (e) {
+          if (e.kod == 404 && !e.komunikat.contains('sprawy')) return null;
+          rethrow;
+        }
+      });
+
+  /// Wartości odczytane z dokumentów (`kanal: "upload"`) dla wszystkich osób sprawy.
+  /// Wartość-część (z której powstała wartość scalona) pomijamy, żeby nie dublować okresów.
+  Future<List<OdczytanePole>> odczytanePola() async {
+    final s = await sprawa();
+    final wynik = <OdczytanePole>[];
+    for (final o in s.osoby) {
+      final d = await dane(osoba: o.id);
+      for (final sekcja in d.sekcje) {
+        for (final p in sekcja.pytania) {
+          for (final w in p.wartosci) {
+            if (w.kanal != 'upload' || w.czescZ != null) continue;
+            wynik.add(OdczytanePole(osoba: d.osoba, pytanie: p, wartosc: w, opis: opisWartosciPola(p, w.wartosc)));
+          }
+        }
+      }
+    }
+    return wynik;
+  }
 }

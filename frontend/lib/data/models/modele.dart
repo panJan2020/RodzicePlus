@@ -230,6 +230,89 @@ class Zadanie {
       );
 }
 
+/// Decyzja ZUS ze sprawy testowej – tylko do porównania (GET /sprawy/{id}/porownanie).
+class DecyzjaZus {
+  const DecyzjaZus({required this.tekst, this.dokumentId, this.strona, this.swiadczenie, this.rozstrzygniecie, this.kwota});
+
+  final String tekst;
+  final String? dokumentId;
+  final int? strona;
+  final String? swiadczenie;
+  final String? rozstrzygniecie; // przyznano | odmowa
+  final String? kwota;
+
+  factory DecyzjaZus.fromJson(Map<String, dynamic> j) => DecyzjaZus(
+        tekst: j['tekst'] as String,
+        dokumentId: j['dokument_id'] as String?,
+        strona: j['strona'] as int?,
+        swiadczenie: j['swiadczenie'] as String?,
+        rozstrzygniecie: j['rozstrzygniecie'] as String?,
+        kwota: j['kwota'] as String?,
+      );
+}
+
+class WynikPorownania {
+  const WynikPorownania({required this.swiadczenie, required this.status, this.kwota});
+
+  final String swiadczenie;
+  final StatusSwiadczenia status;
+  final String? kwota;
+
+  factory WynikPorownania.fromJson(Map<String, dynamic> j) => WynikPorownania(
+        swiadczenie: j['swiadczenie'] as String,
+        status: StatusSwiadczenia.zJson(j['status'] as String),
+        kwota: j['kwota'] as String?,
+      );
+}
+
+enum Zgodnosc {
+  zgodne('zgodne'),
+  rozne('rozne'),
+  nieDoPorownania('nie_do_porownania');
+
+  const Zgodnosc(this.json);
+  final String json;
+  static Zgodnosc zJson(String s) => values.firstWhere((z) => z.json == s, orElse: () => nieDoPorownania);
+}
+
+/// Wynik aplikacji vs decyzja ZUS.
+class Porownanie {
+  const Porownanie({required this.decyzjaZus, this.wynikAplikacji, required this.zgodnosc, required this.uwagi});
+
+  final DecyzjaZus decyzjaZus;
+  final WynikPorownania? wynikAplikacji;
+  final Zgodnosc zgodnosc;
+  final List<String> uwagi;
+
+  factory Porownanie.fromJson(Map<String, dynamic> j) => Porownanie(
+        decyzjaZus: DecyzjaZus.fromJson(j['decyzja_zus'] as Map<String, dynamic>),
+        wynikAplikacji: j['wynik_aplikacji'] == null
+            ? null
+            : WynikPorownania.fromJson(j['wynik_aplikacji'] as Map<String, dynamic>),
+        zgodnosc: Zgodnosc.zJson(j['zgodnosc'] as String),
+        uwagi: _teksty(j['uwagi']),
+      );
+}
+
+/// Wartość odczytana z dokumentu razem z pytaniem i osobą – do listy „Odczytane dane” (składana w repozytorium
+/// z `GET /sprawy/{id}/dane`: wartości z `kanal: "upload"`).
+class OdczytanePole {
+  const OdczytanePole({
+    required this.osoba,
+    required this.pytanie,
+    required this.wartosc,
+    required this.opis,
+  });
+
+  final OsobaSkrot osoba;
+  final PytanieDrzewa pytanie;
+  final WartoscPola wartosc;
+  final String opis; // wartość jako tekst dla człowieka
+
+  /// Pewność ≤ 0,6 – pokazujemy „do sprawdzenia” (backend oznacza < 0,6 flagą, tu obowiązuje próg z promptu).
+  bool get doSprawdzenia => wartosc.doSprawdzenia || wartosc.pewnosc <= 0.6;
+}
+
 // ---------------------------------------------------------------------------
 // Ubezpieczenie (GET /sprawy/{id}/ubezpieczenie – docs/api.md 3.5)
 // ---------------------------------------------------------------------------

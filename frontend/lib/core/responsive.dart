@@ -47,6 +47,7 @@ const pozycjeMenu = <PozycjaMenu>[
   PozycjaMenu('Ubezpieczenie', Icons.health_and_safety_outlined, Icons.health_and_safety, '/ubezpieczenie',
       naTelefonie: false),
   PozycjaMenu('Moje dane', Icons.fact_check_outlined, Icons.fact_check, '/dane'),
+  PozycjaMenu('Dokumenty', Icons.upload_file_outlined, Icons.upload_file, '/dokumenty', naTelefonie: false),
   PozycjaMenu('Świadczenia', Icons.verified_outlined, Icons.verified, '/swiadczenia'),
   PozycjaMenu('Kalkulator', Icons.calculate_outlined, Icons.calculate, '/kalkulator'),
   PozycjaMenu('Moje konto', Icons.person_outline, Icons.person, '/konto', naTelefonie: false),
