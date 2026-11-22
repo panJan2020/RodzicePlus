@@ -383,6 +383,10 @@ Każda wersja ma `obowiazuje_od`. Do wyliczeń bierzemy wersję obowiązującą 
 | Zasiłek pogrzebowy (informacja) | 7 000 zł |
 | Tydzień urlopu / miesiąc zasiłku | 7 dni kalendarzowych / 30 dni (stawka dzienna = 1/30) |
 | Próg pewności odczytu AI | 0,6 (poniżej → `do_sprawdzenia`, niższy priorytet w hierarchii) |
+| Okres obliczeniowy podstawy (`okres_obliczeniowy_mies`) | 12 miesięcy kalendarzowych przed miesiącem powstania prawa (art. 36 ust. 1) |
+| Miesiąc pomijany w podstawie (`art38_min_czesc_czasu_pracy`) | przepracowano mniej niż ½ obowiązującego czasu pracy (art. 38 ust. 2) |
+| Ta sama podstawa (`art43_przerwa_mies`) | przerwa między zasiłkami krótsza niż 1 miesiąc kalendarzowy (art. 43) |
+| Przedłużenie umowy do porodu (`ciaza_tyg`, `przedluzenie_umowy_po_miesiacu_ciazy`) | umowa kończąca się po 3. miesiącu ciąży (art. 177 §3 KP); początek ciąży w przybliżeniu = `pdp` − 40 tyg. |
 
 Parametry z poprzednich lat (np. minimalne wynagrodzenie 2025 dla spraw testowych z 2025 r.) dodajemy jako osobne
 wersje z wcześniejszym `obowiazuje_od`, bo sprawy ZUS dotyczą różnych lat.

@@ -35,7 +35,8 @@ def podstawa_pracownik(miesiace: list[MiesiacWynagrodzenia], pelny_etat: bool, p
         raise ValueError("Brak miesięcy do ustalenia podstawy")
 
     def przepracowal_polowe(m: MiesiacWynagrodzenia) -> bool:
-        return m.dni_obowiazujace == 0 or m.dni_przepracowane * 2 >= m.dni_obowiazujace
+        prog = Decimal(str(p["art38_min_czesc_czasu_pracy"]))
+        return m.dni_obowiazujace == 0 or Decimal(m.dni_przepracowane) >= prog * m.dni_obowiazujace
 
     polowa = [m for m in miesiace if przepracowal_polowe(m)]
     # art. 38 ust. 3: jeśli w KAŻDYM miesiącu mniej niż połowa – bierzemy wszystkie (po uzupełnieniu)

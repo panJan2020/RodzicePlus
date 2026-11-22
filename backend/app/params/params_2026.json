@@ -57,5 +57,14 @@
   "okres_zasilkowy_dni": {"standard": 182, "ciaza": 270, "po_ustaniu": 91},
   "wynagrodzenie_chorobowe_dni": {"standard": 33, "po_50": 14},
   "dzielnik_dzienny": 30,
-  "prog_pewnosci_ai": 0.6
+  "prog_pewnosci_ai": 0.6,
+  "okres_obliczeniowy_mies": 12,
+  "art38_min_czesc_czasu_pracy": 0.5,
+  "art43_przerwa_mies": 1,
+  "ciaza_tyg": 40,
+  "przedluzenie_umowy_po_miesiacu_ciazy": 3,
+  "uwagi": {
+    "swiadczenie_rodzicielskie": "1000 zl - do potwierdzenia na 2026 (docs/pytania_kalkulator.md, Z.2)",
+    "ciaza_tyg": "przyblizenie: poczatek ciazy = przewidywana data porodu minus 40 tygodni (art. 177 par. 3 KP)"
+  }
 }
