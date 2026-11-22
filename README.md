@@ -39,10 +39,10 @@ Testowanie wyglądu na telefonie: w Chrome F12 → ikona telefonu (Device Toolba
 - Frontend: `flutter build web --release --dart-define=API_URL=https://<backend>` → Firebase Hosting / GitHub Pages / Netlify.
 
 ## Dokumentacja
-- `docs/architektura.md` – struktura, decyzje, wyzwania
+- `docs/opis_aplikacji.md` – funkcje, ekrany, pokrycie wymagań z treści zadania
+- `docs/architektura.md` – struktura, model danych, decyzje, wyzwania
 - `docs/api.md` – kontrakt REST
-- `docs/wymagania.md` – wymagania funkcjonalne FR-01..FR-31
-- `docs/pytania_kalkulator.md` – pełna lista pytań i parametrów prawnych
+- `docs/pytania_kalkulator.md` – słownik pól, pytania, przepisy i parametry prawne
 - `CLAUDE.md` – zasady pracy dla agentów AI
 
 ## Użycie AI (wymóg formalny)
