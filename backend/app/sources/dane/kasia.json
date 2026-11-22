@@ -1,0 +1,34 @@
+{
+  "_opis": "Fikcyjny użytkownik do symulacji (mObywatel, ZUS, e-ZLA). Żadnych danych z zestawów ZUS!",
+  "imie": "Katarzyna",
+  "nazwisko": "Przykładowa",
+  "opis": "Umowa o pracę skończyła się 31.08.2026, teraz pracuje na umowie o dzieło – brak ubezpieczenia chorobowego.",
+  "mobywatel": {
+    "data_urodzenia": "1997-08-15"
+  },
+  "zus_konto": {
+    "okresy_ubezpieczenia": [
+      {
+        "tytul": "umowa_o_prace",
+        "platnik": "Sklep Testowy sp. z o.o.",
+        "platnik_ponad_20": "ponad_20",
+        "od": "2022-01-01",
+        "do": "2026-08-31",
+        "chorobowe": true,
+        "chorobowe_dobrowolne": false
+      },
+      {
+        "tytul": "dzielo",
+        "platnik": "Studio Przykładowe",
+        "od": "2026-10-01",
+        "do": null,
+        "chorobowe": false,
+        "chorobowe_dobrowolne": false
+      }
+    ]
+  },
+  "zus_platnik": {
+    "zadluzenie_kwota": "0.00"
+  },
+  "ezla": []
+}

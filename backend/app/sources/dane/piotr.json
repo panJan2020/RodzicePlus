@@ -1,0 +1,37 @@
+{
+  "_opis": "Fikcyjny użytkownik do symulacji (mObywatel, ZUS, e-ZLA). Żadnych danych z zestawów ZUS!",
+  "imie": "Piotr",
+  "nazwisko": "Tata",
+  "opis": "Tata – pracownik i zleceniobiorca, pracodawca zatrudnia do 20 osób.",
+  "mobywatel": {
+    "data_urodzenia": "1989-02-20"
+  },
+  "zus_konto": {
+    "okresy_ubezpieczenia": [
+      {
+        "tytul": "umowa_o_prace",
+        "platnik": "Drukarnia Testowa sp. z o.o.",
+        "platnik_ponad_20": "do_20",
+        "od": "2019-10-01",
+        "do": null,
+        "chorobowe": true,
+        "chorobowe_dobrowolne": false
+      },
+      {
+        "tytul": "zlecenie",
+        "platnik": "Fundacja Przykładowa",
+        "platnik_ponad_20": "do_20",
+        "od": "2025-03-01",
+        "do": null,
+        "chorobowe": false,
+        "chorobowe_dobrowolne": false
+      }
+    ],
+    "etat": "1.00",
+    "srednie_wynagrodzenie_brutto": "9800.00"
+  },
+  "zus_platnik": {
+    "zadluzenie_kwota": "0.00"
+  },
+  "ezla": []
+}

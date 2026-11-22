@@ -139,7 +139,11 @@ odpowiedź na pytanie nadrzędne) albo `wykluczone` (ukryte; wartość zostaje w
 
 ## 4. Źródła danych
 
-Wszystkie źródła implementują ten sam interfejs `Zrodlo.pobierz(sprawa, osoba) → list[WartoscPola]`.
+Wszystkie źródła implementują ten sam interfejs `Zrodlo.pobierz(sprawa, osoba) → {pole: WartoscPola}`
+(jedna wartość na pole z danego źródła; kod: `backend/app/sources/baza.py`). Adapter niczego nie zapisuje –
+wartości trafiają do sprawy przez `merge.dodaj`. Zaimplementowane: `mobywatel`, `zus_konto`, `zus_platnik`, `ezla`;
+pozostałe dochodzą razem z funkcjami, które ich potrzebują. Pola „na tytuł” (np. `platnik_ponad_20`, `chorobowe`)
+mają wartość-słownik `{tytul: wartość}` w jednej `WartoscPola`.
 
 | Adapter | Wystawca | Kanał | Dane |
 |---|---|---|---|

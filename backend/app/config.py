@@ -17,7 +17,7 @@ ADMIN_TOKEN: str = os.getenv("ADMIN_TOKEN", "dev-admin")
 
 PARAMS_DIR = BASE_DIR / "params"
 QUESTIONS_FILE = BASE_DIR / "questions" / "katalog.json"
-MOCKS_FILE = BASE_DIR / "mocks" / "zus_data.json"
+SOURCES_DATA_DIR = BASE_DIR / "sources" / "dane"  # fikcyjni użytkownicy (symulowane źródła)
 
 # Limit uploadu – skany zestawów ZUS mają kilka MB.
 MAX_UPLOAD_MB = 30

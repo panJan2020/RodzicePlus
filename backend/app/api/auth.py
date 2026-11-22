@@ -8,12 +8,10 @@ Przepływ:
 W produkcji krok 2 zastąpiłoby logowanie OIDC przez węzeł krajowy (login.gov.pl / mObywatel),
 a token byłby podpisanym JWT. Kształt odpowiedzi może zostać ten sam.
 """
-import json
-
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from app.config import MOCKS_FILE
+from app import sources
 
 router = APIRouter(prefix="/auth", tags=["logowanie (symulacja)"])
 
@@ -39,7 +37,7 @@ class Sesja(BaseModel):
 
 
 def _konta() -> dict[str, dict]:
-    return json.loads(MOCKS_FILE.read_text(encoding="utf-8"))["uzytkownicy"]
+    return sources.konta()
 
 
 def login_z_tokenu(token: str | None) -> str:
