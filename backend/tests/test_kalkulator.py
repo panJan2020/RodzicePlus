@@ -30,18 +30,18 @@ def test_laczenie_z_praca_max_polowa_etatu():
 
 def test_podstawa_pracownik_minus_skladki():
     m = [MiesiacWynagrodzenia(skladniki_stale=10000)] * 12
-    assert podstawa_pracownik(m, pelny_etat=True, p=P) == Decimal("8629.00")
+    assert podstawa_pracownik(m, etat=1, p=P) == Decimal("8629.00")
 
 
 def test_podstawa_minimalna_pelny_etat_art45():
     m = [MiesiacWynagrodzenia(skladniki_stale=3000)]
-    assert podstawa_pracownik(m, pelny_etat=True, p=P) == Decimal("4147.10")
+    assert podstawa_pracownik(m, etat=1, p=P) == Decimal("4147.10")
 
 
 def test_miesiac_ponizej_polowy_wylaczony_art38():
     m = [MiesiacWynagrodzenia(skladniki_stale=6000, dni_przepracowane=20, dni_obowiazujace=20),
          MiesiacWynagrodzenia(skladniki_stale=1000, dni_przepracowane=5, dni_obowiazujace=20)]
-    assert podstawa_pracownik(m, pelny_etat=False, p=P) == Decimal("5177.40")
+    assert podstawa_pracownik(m, etat=1, p=P) == Decimal("5177.40")
 
 
 def test_limit_podstawy_dobrowolnej():

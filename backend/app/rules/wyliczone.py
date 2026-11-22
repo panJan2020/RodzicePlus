@@ -14,7 +14,7 @@ TYTULY_DOBROWOLNE = ("zlecenie", "dzialalnosc", "wspolpraca")
 UMOWY_PRZEDLUZANE = ("okreslony", "probny")  # art. 177 §3 KP; zastępstwo – nie (§3¹)
 
 
-def _data(v: Any) -> date | None:
+def jako_date(v: Any) -> date | None:
     return date.fromisoformat(str(v)[:10]) if v else None
 
 
@@ -31,19 +31,19 @@ def dodaj_miesiace(d: date, n: int) -> date:
 
 def data_zdarzenia(f: dict[str, Any]) -> date | None:
     """Dzień porodu, a dopóki dziecko się nie urodziło – przewidywany dzień porodu (G2 / G1)."""
-    return _data(f.get("data_porodu")) or _data(f.get("pdp"))
+    return jako_date(f.get("data_porodu")) or jako_date(f.get("pdp"))
 
 
 def zdarzenie_nastapilo(f: dict[str, Any], dzis: date) -> bool:
     """Czy poród już był – tylko wtedy możemy odmówić zasiłku (w innym razie status `warunkowo`)."""
-    d = _data(f.get("data_porodu"))
+    d = jako_date(f.get("data_porodu"))
     return d is not None and d <= dzis
 
 
 def data_prawa(f: dict[str, Any], wybory: dict[str, Any] | None = None) -> date | None:
     """O1: start urlopu macierzyńskiego z scenariusza, potem udzielony urlop (J1), potem dzień porodu."""
     wybory = wybory or {}
-    return _data(wybory.get("start_urlopu_macierzynskiego")) or _data(f.get("macierzynski_od")) \
+    return jako_date(wybory.get("start_urlopu_macierzynskiego")) or jako_date(f.get("macierzynski_od")) \
         or data_zdarzenia(f)
 
 
@@ -76,12 +76,12 @@ class _Tytul:
 
 
 def _tytuly_z_okresow(okresy: list[dict[str, Any]]) -> list[_Tytul]:
-    return [_Tytul(o["tytul"], _data(o.get("od")), _data(o.get("do")), bool(o.get("chorobowe"))) for o in okresy]
+    return [_Tytul(o["tytul"], jako_date(o.get("od")), jako_date(o.get("do")), bool(o.get("chorobowe"))) for o in okresy]
 
 
 def _tytuly_z_odpowiedzi(f: dict[str, Any], u: Ustalenie) -> list[_Tytul]:
     """Bez okresów z ZUS składamy tytuły z odpowiedzi: B1, B3/B3a, B4/B4a, B5."""
-    od = _data(f.get("chorobowe_od"))
+    od = jako_date(f.get("chorobowe_od"))
     chorobowe = f.get("chorobowe") or {}
     wynik = []
     for t in f.get("tytuly") or []:
@@ -91,7 +91,7 @@ def _tytuly_z_odpowiedzi(f: dict[str, Any], u: Ustalenie) -> list[_Tytul]:
                 u.brakujace.append("umowa_rodzaj")
             elif rodzaj != "nieokreslony" and not f.get("umowa_do"):
                 u.brakujace.append("umowa_do")
-            do = _data(f.get("umowa_do")) if rodzaj != "nieokreslony" else None
+            do = jako_date(f.get("umowa_do")) if rodzaj != "nieokreslony" else None
             wynik.append(_Tytul(t, od, do, True))
         elif t in TYTULY_DOBROWOLNE:
             ch = chorobowe.get(t, f.get("chorobowe_dobrowolne"))
@@ -138,7 +138,7 @@ def ubezpieczony_w_dniu(f: dict[str, Any], dzien: date | None, p: dict[str, Any]
 
     if u.wartosc and f.get("plan_ustania") is True:
         u.pola += ["plan_ustania", "plan_ustania_data"]
-        koniec = _data(f.get("plan_ustania_data"))
+        koniec = jako_date(f.get("plan_ustania_data"))
         if koniec is None:
             u.uwagi.append("Planujesz zakończyć ubezpieczenie przed porodem. Podaj datę, a sprawdzimy, "
                            "czy w dniu porodu nadal będziesz ubezpieczona.")
@@ -154,7 +154,7 @@ def _bez_ubezpieczenia(f: dict[str, Any], tytuly: list[_Tytul], dzien: date, p: 
                        u: Ustalenie) -> None:
     """Żaden tytuł nie daje ubezpieczenia w tym dniu – sprawdzamy jeszcze przedłużenie umowy do porodu."""
     rodzaj = f.get("umowa_rodzaj")
-    pdp = _data(f.get("pdp")) or dzien
+    pdp = jako_date(f.get("pdp")) or dzien
     umowy = [t for t in tytuly if t.tytul == "umowa_o_prace" and t.chorobowe and t.do and t.do < dzien]
     if umowy:
         u.pola.append("umowa_rodzaj")

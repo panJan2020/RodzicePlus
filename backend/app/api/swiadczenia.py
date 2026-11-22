@@ -46,17 +46,12 @@ def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -
     return wyniki
 
 
-def _podstawa(f: dict, p: dict) -> Decimal:
-    tytuly = f.get("tytuly") or []
-    if "umowa_o_prace" in tytuly and f.get("srednie_wynagrodzenie_brutto"):
-        # Tryb uproszczony (O4s). Pełny tryb z miesięcy (Z-3) – etap 2.
-        m = pw.MiesiacWynagrodzenia(skladniki_stale=float(Decimal(f["srednie_wynagrodzenie_brutto"])))
-        pelny_etat = Decimal(str(f.get("etat") or "1")) >= 1
-        return pw.podstawa_pracownik([m], pelny_etat=pelny_etat, p=p)
-    if f.get("podstawa_deklarowana_srednia"):
-        return pw.podstawa_dobrowolne([float(Decimal(f["podstawa_deklarowana_srednia"]))], p)
-    raise HTTPException(422, "Aby policzyć kwotę, podaj średnie wynagrodzenie albo podstawę składek "
-                             "(pytania O4s, Q1s).")
+def _podstawa(f: dict, data_prawa, p: dict) -> Decimal:
+    u = pw.ustal_podstawe(f, data_prawa, p)
+    if u.kwota is None:
+        raise HTTPException(422, "Aby policzyć kwotę, podaj średnie wynagrodzenie albo podstawę składek "
+                                 "(pytania O4s, Q1s).")
+    return u.kwota
 
 
 @router.get("/kalkulator", response_model=WynikKalkulatora)
@@ -74,7 +69,7 @@ def kalkulator(sprawa_id: str, osoba: str | None = None,
         raise HTTPException(422, "Aby policzyć zasiłek, podaj datę porodu albo przewidywaną datę porodu "
                                  "(pytania G1, G2).")
     p = get_params(data_porodu)
-    podstawa = _podstawa(f, p)
+    podstawa = _podstawa(f, data_porodu, p)
     wybory = scenariusz.domyslny(f, p)
 
     okresy = timeline.plan_matki(
