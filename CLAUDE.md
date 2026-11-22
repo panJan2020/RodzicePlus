@@ -487,7 +487,7 @@ pytest
 cd frontend
 flutter pub get
 flutter run -d chrome --dart-define=API_URL=http://localhost:8000
-rm -rf build/web && flutter build web --release   # adres API względny; osobny host: --dart-define=API_URL=https://<backend>
+rm -rf build/web && flutter build web --release   # adres API względny; osobny host: --dart-define=API_URL=https://rodziceplus-production.up.railway.app
 cp -r build/web ../backend/static                     # backend serwuje frontend z backend/static (katalog w .gitignore)
 ```
 

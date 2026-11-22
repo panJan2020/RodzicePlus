@@ -21,7 +21,11 @@ app = FastAPI(title="Zasiłkowy Przewodnik Przyszłego Rodzica – API", version
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.CORS_ORIGINS,
+    allow_origins=[
+        "https://rodzicplusplus.web.app",
+        "https://rodzicplusplus.firebaseapp.com/",
+        "http://localhost:8080",
+    ],
     allow_origin_regex=config.CORS_ORIGIN_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],

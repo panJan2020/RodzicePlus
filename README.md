@@ -36,7 +36,8 @@ Testowanie wyglądu na telefonie: w Chrome F12 → ikona telefonu (Device Toolba
 ## Wdrożenie (demo dla jurorów)
 - Backend: Render / Railway (Python, start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, katalog `backend`).
   Zmienne środowiskowe: `ANTHROPIC_API_KEY`, `CORS_ORIGINS`, `ADMIN_TOKEN`.
-- Frontend: `flutter build web --release --dart-define=API_URL=https://<backend>` → Firebase Hosting / GitHub Pages / Netlify.
+- Backend (działa): https://rodziceplus-production.up.railway.app
+- Frontend: `flutter build web --release --dart-define=API_URL=https://rodziceplus-production.up.railway.app` → Firebase Hosting / GitHub Pages / Netlify.
 
 ## Dokumentacja
 - `docs/opis_aplikacji.md` – funkcje, ekrany, pokrycie wymagań z treści zadania
