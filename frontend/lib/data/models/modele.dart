@@ -41,6 +41,9 @@ class Sesja {
 
   String get imieINazwisko => '$imie $nazwisko';
 
+  Map<String, Object?> toJson() =>
+      {'token': token, 'login': login, 'imie': imie, 'nazwisko': nazwisko, 'admin': admin};
+
   factory Sesja.fromJson(Map<String, dynamic> j) => Sesja(
         token: j['token'] as String,
         login: j['login'] as String,
@@ -82,13 +85,15 @@ class OsobaSprawy {
 }
 
 class Liczniki {
-  const Liczniki({this.konflikty = 0, this.niespojnosci = 0, this.brakujacePola = 0});
+  const Liczniki({this.konflikty = 0, this.niespojnosci = 0, this.brakujacePola = 0, this.dokumenty = 0});
 
   final int konflikty;
   final int niespojnosci;
   final int brakujacePola;
+  final int dokumenty; // liczba rozpoznanych dokumentów (tylko w GET /sprawy/{id})
 
   factory Liczniki.fromJson(Map<String, dynamic> j) => Liczniki(
+        dokumenty: (j['dokumenty'] as int?) ?? 0,
         konflikty: (j['konflikty'] as int?) ?? 0,
         niespojnosci: (j['niespojnosci'] as int?) ?? 0,
         brakujacePola: (j['brakujace_pola'] as int?) ?? 0,
@@ -715,6 +720,37 @@ class KwotaWyniku {
 List<BrakujacePole> _pola(Object? lista) =>
     [for (final b in (lista as List? ?? [])) BrakujacePole.fromJson(b as Map<String, dynamic>)];
 
+/// Pole użyte w wyniku i źródło jego wartości („Skąd te dane?”).
+class ZrodloDanych {
+  const ZrodloDanych({
+    required this.pole,
+    required this.tresc,
+    required this.zrodloOpis,
+    this.kanal = '',
+    this.dokumentId,
+    this.strona,
+    this.doSprawdzenia = false,
+  });
+
+  final String pole;
+  final String tresc;
+  final String zrodloOpis; // np. „Z-3, str. 7”, „Konto w ZUS”, „Twoja odpowiedź”
+  final String kanal;
+  final String? dokumentId;
+  final int? strona;
+  final bool doSprawdzenia;
+
+  factory ZrodloDanych.fromJson(Map<String, dynamic> j) => ZrodloDanych(
+        pole: j['pole'] as String,
+        tresc: j['tresc'] as String,
+        zrodloOpis: j['zrodlo_opis'] as String,
+        kanal: (j['kanal'] as String?) ?? '',
+        dokumentId: j['dokument_id'] as String?,
+        strona: j['strona'] as int?,
+        doSprawdzenia: (j['do_sprawdzenia'] as bool?) ?? false,
+      );
+}
+
 class WynikSwiadczenia {
   const WynikSwiadczenia({
     required this.swiadczenie,
@@ -741,6 +777,7 @@ class WynikSwiadczenia {
     this.ktoWyplacaOpis,
     this.gdzieZlozyc,
     this.wersjaParametrow = '',
+    this.zrodlaDanych = const [],
   });
 
   final String swiadczenie;
@@ -767,6 +804,7 @@ class WynikSwiadczenia {
   final String? ktoWyplacaOpis;
   final String? gdzieZlozyc;
   final String wersjaParametrow;
+  final List<ZrodloDanych> zrodlaDanych;
 
   factory WynikSwiadczenia.fromJson(Map<String, dynamic> j) => WynikSwiadczenia(
         swiadczenie: j['swiadczenie'] as String,
@@ -795,6 +833,9 @@ class WynikSwiadczenia {
         ktoWyplacaOpis: j['kto_wyplaca_opis'] as String?,
         gdzieZlozyc: j['gdzie_zlozyc'] as String?,
         wersjaParametrow: j['wersja_parametrow'] as String? ?? '',
+        zrodlaDanych: [
+          for (final z in (j['zrodla_danych'] as List? ?? [])) ZrodloDanych.fromJson(z as Map<String, dynamic>),
+        ],
       );
 }
 

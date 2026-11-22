@@ -6,11 +6,13 @@ import '../../core/responsive.dart';
 import '../../core/theme.dart';
 import '../../data/models/modele.dart';
 import '../../shared/formatowanie.dart';
+import '../../shared/widgets/przycisk_wstecz.dart';
 import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
+import '../../shared/widgets/znacznik.dart';
 import 'moje_swiadczenia_viewmodel.dart';
 
-/// „Świadczenia” – wynik każdej reguły z uzasadnieniem: status, okres, kwota, kto wypłaca, braki.
+/// „Moje świadczenia” – wynik każdej reguły z uzasadnieniem: status, okres, kwota, kto wypłaca, braki.
 /// Komputer: karty po dwie obok siebie; telefon i tablet: jedna pod drugą.
 class MojeSwiadczeniaView extends StatelessWidget {
   const MojeSwiadczeniaView({super.key});
@@ -33,19 +35,18 @@ class _Tresc extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return TrescStrony(
       children: [
+        const PrzyciskWstecz(domyslna: '/dokumenty'),
         Semantics(header: true, child: Text('Twoje świadczenia', style: t.headlineMedium)),
         const SizedBox(height: 8),
         Text('Sprawdzamy, czy przysługuje Ci zasiłek, za jaki okres i w jakiej wysokości. Korzystamy z Twoich '
-            'danych z zakładki „Moje dane”.', style: t.bodyLarge),
+            'dokumentów i danych z zakładki „Moje dane”.', style: t.bodyLarge),
         const SizedBox(height: 24),
         StanLadowania(
           laduje: vm.laduje,
           blad: vm.blad,
           onPonow: vm.zaladuj,
           tresc: (_) {
-            if (vm.wyniki.isEmpty) {
-              return Text('Nie mamy jeszcze wyników. Uzupełnij „Moje dane”.', style: t.bodyLarge);
-            }
+            if (vm.wyniki.isEmpty) return const _Pusto();
             final karty = [for (final w in vm.wyniki) KartaSwiadczenia(wynik: w)];
             if (Responsive.uklad(context) != Uklad.komputer) {
               return Column(
@@ -78,6 +79,35 @@ class _Tresc extends StatelessWidget {
   }
 }
 
+class _Pusto extends StatelessWidget {
+  const _Pusto();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(children: [
+          const Icon(Icons.inbox_outlined, size: 40, color: Kolory.tekstDrugorzedny, semanticLabel: 'Brak wyników'),
+          const SizedBox(height: 12),
+          Text('Nie mamy jeszcze wyników.', style: t.titleMedium),
+          const SizedBox(height: 4),
+          Text('Wgraj dokumenty albo uzupełnij „Moje dane”, a ocenimy, jakie świadczenia Ci przysługują.',
+              textAlign: TextAlign.center, style: t.bodyLarge),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => context.go('/dokumenty'),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Wgraj dokumenty'),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Status zawsze z ikoną i tekstem, nie tylko kolorem.
 (Color, Color, IconData, String) wygladStatusu(StatusSwiadczenia s) => switch (s) {
       StatusSwiadczenia.przysluguje => (Kolory.primary, Kolory.primaryLight, Icons.check_circle, 'Przysługuje'),
@@ -86,6 +116,8 @@ class _Tresc extends StatelessWidget {
       StatusSwiadczenia.brakDanych => (Kolory.ostrzezenie, Kolory.ostrzezenieTlo, Icons.help, 'Brakuje danych'),
     };
 
+/// Karta jednego świadczenia: status (kolor + słowo + ikona), podsumowanie, okres i kwota, uzasadnienie
+/// (rozwijane), uwagi, braki i kroki oraz „Skąd te dane?”.
 class KartaSwiadczenia extends StatelessWidget {
   const KartaSwiadczenia({super.key, required this.wynik});
   final WynikSwiadczenia wynik;
@@ -95,6 +127,15 @@ class KartaSwiadczenia extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final w = wynik;
     final (kolor, tlo, ikona, napis) = wygladStatusu(w.status);
+    final powodyIUzasadnienie = [
+      ...w.uzasadnienie,
+      for (final p in w.powody) p.komunikat,
+    ];
+    final maOkresLubKwote = w.kwota != null || w.okres != null || w.okresWynagrodzenia != null;
+    final pokazBlokKwoty = maOkresLubKwote ||
+        w.status == StatusSwiadczenia.przysluguje ||
+        w.status == StatusSwiadczenia.warunkowo;
+    final maKroki = w.brakujacePola.isNotEmpty || w.polaDoPotwierdzenia.isNotEmpty || w.coZrobic.isNotEmpty;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -108,70 +149,54 @@ class KartaSwiadczenia extends StatelessWidget {
             Semantics(header: true, child: Text(w.nazwa, style: t.titleLarge)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              _Znacznik(kolor: kolor, tlo: tlo, ikona: ikona, napis: napis),
+              Znacznik(kolor: kolor, tlo: tlo, ikona: ikona, napis: napis),
               if (w.orientacyjny)
-                const _Znacznik(kolor: Kolory.ostrzezenie, tlo: Kolory.ostrzezenieTlo, ikona: Icons.info_outline,
+                const Znacznik(kolor: Kolory.ostrzezenie, tlo: Kolory.ostrzezenieTlo, ikona: Icons.info_outline,
                     napis: 'Wynik orientacyjny'),
             ]),
             const SizedBox(height: 12),
             Text(w.podsumowanie, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-            if (w.kwota != null || w.okres != null) ...[const SizedBox(height: 12), _OkresIKwota(wynik: w)],
+            if (pokazBlokKwoty) ...[const SizedBox(height: 12), _OkresIKwota(wynik: w)],
             if (w.warunki.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _Lista(tytul: 'Warunek', teksty: [for (final x in w.warunki) x.opis], ikona: Icons.schedule),
+              Text('Warunek', style: t.titleMedium),
+              const SizedBox(height: 4),
+              for (final x in w.warunki) _Punkt(tekst: x.opis, ikona: Icons.schedule),
             ],
-            if (w.uzasadnienie.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Lista(tytul: 'Dlaczego', teksty: w.uzasadnienie),
-            ],
-            if (w.powody.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Lista(tytul: 'Powód', teksty: [for (final p in w.powody) p.komunikat], ikona: Icons.cancel_outlined),
-            ],
-            if (w.ktoWyplacaOpis != null || w.gdzieZlozyc != null) ...[
-              const SizedBox(height: 12),
-              _Lista(tytul: 'Kto wypłaca i gdzie złożyć wniosek',
-                  teksty: [?w.ktoWyplacaOpis, ?w.gdzieZlozyc], ikona: Icons.account_balance_outlined),
-            ],
-            if (w.coZrobic.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Lista(tytul: 'Co możesz zrobić', teksty: w.coZrobic, ikona: Icons.arrow_forward),
-            ],
-            if (w.polaDoPotwierdzenia.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Pytania(
-                tytul: 'Do potwierdzenia (wynik opiera się na Twoich deklaracjach albo przybliżeniu)',
-                pytania: w.polaDoPotwierdzenia,
-                przycisk: null,
-              ),
-            ],
-            if (w.brakujacePola.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _Pytania(
-                tytul: w.status == StatusSwiadczenia.brakDanych
-                    ? 'Brakuje odpowiedzi: ${w.brakujacePola.length}'
-                    : 'Uzupełnij, aby wynik był pełny: ${w.brakujacePola.length}',
-                pytania: w.brakujacePola,
-                przycisk: 'Uzupełnij',
+            if (powodyIUzasadnienie.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  initiallyExpanded: w.status == StatusSwiadczenia.niePrzysluguje,
+                  title: Text('Dlaczego tak?', style: t.titleMedium),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  children: [for (final x in powodyIUzasadnienie) _Punkt(tekst: x)],
+                ),
               ),
             ],
             if (w.uwagi.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               for (final u in w.uwagi)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2, right: 8),
-                      child: Icon(Icons.info_outline, size: 18, color: Kolory.secondary, semanticLabel: 'Uwaga'),
-                    ),
-                    Expanded(child: Text(u, style: t.bodyMedium)),
-                  ]),
-                ),
+                _Punkt(tekst: u, ikona: Icons.info_outline, kolorIkony: Kolory.secondary, opis: 'Uwaga'),
             ],
+            if (maKroki) ...[const SizedBox(height: 12), _CzegoBrakuje(wynik: w)],
             if (w.podstawaPrawna.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text('(${w.podstawaPrawna.join('; ')})', style: t.bodyMedium),
+            ],
+            if (w.zrodlaDanych.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _pokazZrodla(context, w),
+                  icon: const Icon(Icons.travel_explore),
+                  label: const Text('Skąd te dane?'),
+                ),
+              ),
             ],
           ],
         ),
@@ -180,38 +205,92 @@ class KartaSwiadczenia extends StatelessWidget {
   }
 }
 
-class _Znacznik extends StatelessWidget {
-  const _Znacznik({required this.kolor, required this.tlo, required this.ikona, required this.napis});
-  final Color kolor;
-  final Color tlo;
-  final IconData ikona;
-  final String napis;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: tlo, borderRadius: BorderRadius.circular(12)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(ikona, color: kolor, size: 18, semanticLabel: napis),
-          const SizedBox(width: 6),
-          Flexible(child: Text(napis, style: TextStyle(color: kolor, fontWeight: FontWeight.w700, fontSize: 15))),
-        ]),
-      );
+/// „Skąd te dane?” – pola użyte w wyniku z dokumentem i stroną (albo innym źródłem).
+void _pokazZrodla(BuildContext context, WynikSwiadczenia w) {
+  showDialog<void>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Skąd te dane?'),
+      content: SizedBox(
+        width: Responsive.maxFormularz,
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Wynik „${w.nazwa}” opiera się na tych danych:', style: Theme.of(c).textTheme.bodyLarge),
+            const SizedBox(height: 12),
+            for (final z in w.zrodlaDanych)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(z.tresc, style: Theme.of(c).textTheme.titleMedium),
+                  Text(z.zrodloOpis, style: Theme.of(c).textTheme.bodyLarge),
+                  if (z.doSprawdzenia)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Znacznik(kolor: Kolory.ostrzezenie, tlo: Kolory.ostrzezenieTlo,
+                          ikona: Icons.warning_amber, napis: 'Do potwierdzenia'),
+                    ),
+                ]),
+              ),
+          ]),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Zamknij'))],
+    ),
+  );
 }
 
-/// Okres i kwota – „tabela” jako wiersze etykieta: wartość (na telefonie też czytelne).
-class _OkresIKwota extends StatelessWidget {
-  const _OkresIKwota({required this.wynik});
-  final WynikSwiadczenia wynik;
+/// Punkt listy z ikoną.
+class _Punkt extends StatelessWidget {
+  const _Punkt({required this.tekst, this.ikona, this.kolorIkony = Kolory.tekstDrugorzedny, this.opis});
+  final String tekst;
+  final IconData? ikona;
+  final Color kolorIkony;
+  final String? opis;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final o = wynik.okres;
-    final k = wynik.kwota;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: EdgeInsets.only(top: ikona == null ? 9 : 2, right: 10, left: ikona == null ? 4 : 0),
+          child: Icon(ikona ?? Icons.circle, size: ikona == null ? 6 : 18, color: kolorIkony, semanticLabel: opis),
+        ),
+        Expanded(child: Text(tekst, style: t.bodyLarge)),
+      ]),
+    );
+  }
+}
+
+/// Okres, kto wypłaca i kwota – wiersze „etykieta: wartość” (czytelne też na telefonie).
+class _OkresIKwota extends StatelessWidget {
+  const _OkresIKwota({required this.wynik});
+  final WynikSwiadczenia wynik;
+
+  /// Dlaczego nie ma kwoty: brakujące dane albo pierwsza uwaga reguły.
+  String _powodBrakuKwoty() {
+    final w = wynik;
+    if (w.brakujacePola.isNotEmpty) return 'brakuje: ${w.brakujacePola.map((b) => b.tresc).join('; ')}';
+    if (w.uwagi.isNotEmpty) return w.uwagi.first;
+    return 'brakuje danych do wyliczenia';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final w = wynik;
+    final o = w.okres;
+    final k = w.kwota;
+    final wo = w.okresWynagrodzenia;
     final wiersze = <(String, String)>[
       if (o != null)
         ('Okres', '${formatujDate(o.odDnia)} – ${formatujDate(o.doDnia)}${o.dlugoscTekst == null ? '' : ' (${o.dlugoscTekst})'}'),
+      if (wo != null)
+        ('Wynagrodzenie od płatnika składek',
+            'za okres ${formatujDate(wo.odDnia)} – ${formatujDate(wo.doDnia)}${wo.dlugoscTekst == null ? '' : ' (${wo.dlugoscTekst})'}'),
+      if (w.ktoWyplaca != null)
+        ('Kto wypłaca', w.ktoWyplaca == 'zus' ? 'ZUS' : 'pracodawca (płatnik składek)'),
       if (k != null) ...[
         ('Miesięcznie', '${formatujKwote(k.miesieczna)} brutto'),
         ('Za cały okres', '${formatujKwote(k.zaOkres)} brutto'),
@@ -219,6 +298,9 @@ class _OkresIKwota extends StatelessWidget {
             ? 'różna w częściach okresu (zależnie od kodu zwolnienia)'
             : '${formatujProcent(k.stawka!)} podstawy${k.stawkaDzienna == null ? '' : ' · ${formatujKwote(k.stawkaDzienna!)} dziennie'}'),
         ('Podstawa wymiaru', formatujKwote(k.podstawaWymiaru)),
+      ] else ...[
+        if (w.stawka != null) ('Stawka', '${formatujProcent(w.stawka!)} podstawy'),
+        ('Kwota', 'nie można jeszcze obliczyć – ${_powodBrakuKwoty()}'),
       ],
     ];
     return Container(
@@ -236,54 +318,25 @@ class _OkresIKwota extends StatelessWidget {
                 Text(wartosc, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
               ]),
             ),
-          if (k == null) Text('Kwoty jeszcze nie możemy policzyć – zobacz, czego brakuje.', style: t.bodyMedium),
+          if (w.ktoWyplacaOpis != null || w.gdzieZlozyc != null) ...[
+            const SizedBox(height: 8),
+            for (final x in [?w.ktoWyplacaOpis, ?w.gdzieZlozyc]) Text(x, style: t.bodyMedium),
+          ],
         ],
       ),
     );
   }
 }
 
-class _Lista extends StatelessWidget {
-  const _Lista({required this.tytul, required this.teksty, this.ikona = Icons.circle});
-  final String tytul;
-  final List<String> teksty;
-  final IconData ikona;
+/// „Czego brakuje i co zrobić”: braki (z przejściem do „Moich danych”), pola do potwierdzenia i kroki.
+class _CzegoBrakuje extends StatelessWidget {
+  const _CzegoBrakuje({required this.wynik});
+  final WynikSwiadczenia wynik;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final kropka = ikona == Icons.circle;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(tytul, style: t.titleMedium),
-        const SizedBox(height: 4),
-        for (final x in teksty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Padding(
-                padding: EdgeInsets.only(top: kropka ? 9 : 2, right: 10, left: kropka ? 4 : 0),
-                child: Icon(ikona, size: kropka ? 6 : 18, color: Kolory.tekstDrugorzedny),
-              ),
-              Expanded(child: Text(x, style: t.bodyLarge)),
-            ]),
-          ),
-      ],
-    );
-  }
-}
-
-/// Lista pytań (braki albo pola do potwierdzenia) + opcjonalnie „Uzupełnij” → `/dane?pytanie=<pierwsze ID>`.
-class _Pytania extends StatelessWidget {
-  const _Pytania({required this.tytul, required this.pytania, required this.przycisk});
-  final String tytul;
-  final List<BrakujacePole> pytania;
-  final String? przycisk;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    final w = wynik;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -291,27 +344,52 @@ class _Pytania extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(tytul, style: t.titleMedium),
-          const SizedBox(height: 6),
-          for (final b in pytania)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${b.tresc} (${b.pytanieId})', style: t.bodyLarge),
-                if (b.gdzieZnalezc != null) Text('Znajdziesz to: ${b.gdzieZnalezc}', style: t.bodyMedium),
-              ]),
-            ),
-          if (przycisk != null) ...[
-            const SizedBox(height: 4),
+          Semantics(header: true, child: Text('Czego brakuje i co zrobić', style: t.titleMedium)),
+          if (w.brakujacePola.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(w.status == StatusSwiadczenia.brakDanych
+                ? 'Brakuje odpowiedzi: ${w.brakujacePola.length}'
+                : 'Uzupełnij, aby wynik był pełny: ${w.brakujacePola.length}', style: t.bodyMedium),
+            for (final b in w.brakujacePola) _Pytanie(pole: b),
+          ],
+          if (w.polaDoPotwierdzenia.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Do potwierdzenia (wynik opiera się na Twoich deklaracjach albo przybliżeniu):', style: t.bodyMedium),
+            for (final b in w.polaDoPotwierdzenia) _Pytanie(pole: b),
+          ],
+          if (w.coZrobic.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Co możesz zrobić:', style: t.bodyMedium),
+            for (final x in w.coZrobic) _Punkt(tekst: x, ikona: Icons.arrow_forward),
+          ],
+          if (w.brakujacePola.isNotEmpty) ...[
+            const SizedBox(height: 8),
             FilledButton.icon(
-              onPressed: () =>
-                  context.go(Uri(path: '/dane', queryParameters: {'pytanie': pytania.first.pytanieId}).toString()),
+              onPressed: () => context
+                  .go(Uri(path: '/dane', queryParameters: {'pytanie': w.brakujacePola.first.pytanieId}).toString()),
               icon: const Icon(Icons.edit),
-              label: Text(przycisk!),
+              label: const Text('Uzupełnij'),
             ),
           ],
         ],
       ),
+    );
+  }
+}
+
+class _Pytanie extends StatelessWidget {
+  const _Pytanie({required this.pole});
+  final BrakujacePole pole;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${pole.tresc} (${pole.pytanieId})', style: t.bodyLarge),
+        if (pole.gdzieZnalezc != null) Text('Znajdziesz to: ${pole.gdzieZnalezc}', style: t.bodyMedium),
+      ]),
     );
   }
 }

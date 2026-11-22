@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../data/models/modele.dart';
 import '../../data/models/plik_do_wgrania.dart';
+import '../../shared/widgets/przycisk_wstecz.dart';
 import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
 import '../../shared/widgets/znacznik.dart';
@@ -64,6 +65,7 @@ class _Tresc extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return TrescStrony(
       children: [
+        const PrzyciskWstecz(),
         Semantics(header: true, child: Text('Dokumenty', style: t.headlineMedium)),
         const SizedBox(height: 8),
         Text('Wgraj skany dokumentów (PDF) – rozpoznamy je, odczytamy z nich dane i sprawdzimy, jakie świadczenia Ci '
@@ -264,7 +266,7 @@ class _Wyniki extends StatelessWidget {
       Align(
         alignment: Alignment.centerLeft,
         child: FilledButton.icon(
-          onPressed: () => context.go('/swiadczenia'),
+          onPressed: () => context.push('/swiadczenia'),
           icon: const Icon(Icons.arrow_forward),
           label: const Text('Zobacz moje świadczenia'),
         ),

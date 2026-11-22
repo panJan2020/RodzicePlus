@@ -15,7 +15,7 @@ class LogowanieView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (c) => LogowanieViewModel(c.read()),
+      create: (c) => LogowanieViewModel(c.read(), c.read()),
       child: const _Tresc(),
     );
   }
@@ -42,27 +42,40 @@ class _Tresc extends StatelessWidget {
         const SizedBox(height: 16),
         const _InformacjaOSymulacji(),
         const SizedBox(height: 24),
-        Semantics(header: true, child: Text('Wybierz konto testowe', style: t.titleLarge)),
+        Semantics(header: true, child: Text('Konto testowe', style: t.titleLarge)),
+        const SizedBox(height: 4),
+        Text('Wybierz fikcyjną osobę, której dane pokażemy w aplikacji.', style: t.bodyMedium),
         const SizedBox(height: 12),
-        if (vm.bladLogowania != null) ...[
-          _Komunikat(tekst: vm.bladLogowania!),
-          const SizedBox(height: 12),
-        ],
         StanLadowania(
           laduje: vm.laduje,
           blad: vm.blad,
           onPonow: vm.zaladuj,
           tresc: (_) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final k in vm.konta) ...[
                 _KartaKonta(
                   konto: k,
-                  logujeSie: vm.logujeSie == k.login,
-                  zablokowana: vm.logujeSie != null,
-                  onWybierz: () => _zaloguj(context, vm, k),
+                  wybrane: vm.wybrany == k.login,
+                  onWybierz: vm.logujeSie != null ? null : () => vm.wybierz(k.login),
                 ),
                 const SizedBox(height: 12),
               ],
+              if (vm.bladLogowania != null) ...[
+                _Komunikat(tekst: vm.bladLogowania!),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 4),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), textStyle: t.titleMedium),
+                onPressed: vm.wybrany == null || vm.logujeSie != null ? null : () => _zaloguj(context, vm),
+                icon: vm.logujeSie != null
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, semanticsLabel: 'Logowanie'))
+                    : const Icon(Icons.login),
+                label: const Text('Zaloguj przez mObywatel (symulacja)'),
+              ),
             ],
           ),
         ),
@@ -70,11 +83,11 @@ class _Tresc extends StatelessWidget {
     );
   }
 
-  Future<void> _zaloguj(BuildContext context, LogowanieViewModel vm, KontoTestowe k) async {
+  Future<void> _zaloguj(BuildContext context, LogowanieViewModel vm) async {
     final messenger = ScaffoldMessenger.of(context);
-    final sesja = await vm.zaloguj(k.login);
+    final sesja = await vm.zaloguj();
     if (sesja != null) {
-      messenger.showSnackBar(SnackBar(content: Text('Zalogowano jako ${sesja.imieINazwisko}.')));
+      messenger.showSnackBar(SnackBar(content: Text('Zalogowano jako ${sesja.imieINazwisko} (symulacja).')));
     }
   }
 }
@@ -129,36 +142,39 @@ class _Komunikat extends StatelessWidget {
 }
 
 class _KartaKonta extends StatelessWidget {
-  const _KartaKonta({
-    required this.konto,
-    required this.logujeSie,
-    required this.zablokowana,
-    required this.onWybierz,
-  });
+  const _KartaKonta({required this.konto, required this.wybrane, required this.onWybierz});
 
   final KontoTestowe konto;
-  final bool logujeSie;
-  final bool zablokowana;
-  final VoidCallback onWybierz;
+  final bool wybrane;
+  final VoidCallback? onWybierz;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: wybrane,
       button: true,
-      label: 'Zaloguj jako ${konto.imieINazwisko}. ${konto.opis}',
+      label: '${konto.imieINazwisko}. ${konto.opis}',
       excludeSemantics: true,
+      onTap: onWybierz,
       child: Card(
+        margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
+        color: wybrane ? Kolory.primaryLight : null,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: wybrane ? Kolory.primary : Kolory.ramka, width: wybrane ? 2 : 1),
+        ),
         child: InkWell(
-          onTap: zablokowana ? null : onWybierz,
+          onTap: onWybierz,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: Kolory.primaryLight,
+                  backgroundColor: Kolory.powierzchnia,
                   foregroundColor: Kolory.primaryDark,
                   child: Text(konto.imie.characters.first, style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
@@ -176,12 +192,7 @@ class _KartaKonta extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                SizedBox.square(
-                  dimension: 24,
-                  child: logujeSie
-                      ? const CircularProgressIndicator(strokeWidth: 2.5)
-                      : const Icon(Icons.chevron_right, color: Kolory.primary),
-                ),
+                Icon(wybrane ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: Kolory.primary),
               ],
             ),
           ),

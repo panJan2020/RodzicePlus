@@ -24,6 +24,17 @@ DLA_ROL: dict[str, tuple[str, ...]] = {
     "zasilek_macierzynski": ("matka",),
     "zasilek_chorobowy_ciaza": ("matka",),
 }
+# Pola, z których korzysta reguła – do „Skąd te dane?” (w wyniku trafiają tylko te, które mają aktywną wartość).
+POLA_WEJSCIOWE: dict[str, tuple[str, ...]] = {
+    "zasilek_macierzynski": (
+        "sytuacja", "data_porodu", "pdp", "liczba_dzieci", "tytuly", "chorobowe", "chorobowe_od", "chorobowe_dobrowolne",
+        "okresy_ubezpieczenia", "platnik_ponad_20", "etat", "umowa_do", "miesiace", "srednie_wynagrodzenie_brutto",
+        "podstawa_deklarowana", "podstawa_deklarowana_srednia", "zadluzenie_kwota", "poprzedni_zasilek"),
+    "zasilek_chorobowy_ciaza": (
+        "ezla", "ezla_kod_b", "pdp", "data_porodu", "tytuly", "chorobowe", "chorobowe_od", "chorobowe_dobrowolne",
+        "zatrudnienie_od", "okresy_ubezpieczenia", "platnik_ponad_20", "wynagrodzenie_chorobowe_okres", "miesiace",
+        "podstawa_deklarowana", "podstawa_60_proc", "data_urodzenia", "poprzedni_zasilek"),
+}
 # Dzień powstania prawa – do wyboru wersji parametrów (fakty, wybory scenariusza → data albo None).
 DATA_PRAWA: dict[str, Callable[[dict[str, Any], dict[str, Any]], date | None]] = {
     "zasilek_macierzynski": wyliczone.data_prawa,

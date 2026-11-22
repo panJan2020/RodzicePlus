@@ -2,20 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/responsive.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets/tresc_strony.dart';
+import 'start_viewmodel.dart';
 
-/// Ekran startowy (statyczny – bez ViewModelu). Zachęca do zalogowania.
+/// Ekran startowy: do kogo jest aplikacja, co zrobi, i dwa duże przyciski – „Wgraj dokumenty”
+/// oraz „Zobacz świadczenia” (aktywny, gdy sprawa ma dane).
 class StartView extends StatelessWidget {
   const StartView({super.key});
 
   @override
+  Widget build(BuildContext context) =>
+      ChangeNotifierProvider(create: (c) => StartViewModel(c.read()), child: const _Tresc());
+}
+
+class _Tresc extends StatelessWidget {
+  const _Tresc();
+
+  @override
   Widget build(BuildContext context) {
     final sesja = context.watch<SesjaAplikacji>();
+    final vm = context.watch<StartViewModel>();
     final t = Theme.of(context).textTheme;
+    const duzyPrzycisk = Size.fromHeight(56);
 
     return TrescStrony(
+      maxSzerokosc: Responsive.maxFormularz,
       children: [
         Semantics(
           header: true,
@@ -26,55 +40,47 @@ class StartView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Pomożemy Ci ustalić prawo do zasiłku macierzyńskiego i innych świadczeń z ZUS, '
-          'policzyć ich wysokość i przygotować potrzebne dokumenty.',
+          'Dla przyszłych rodziców, kobiet w ciąży oraz rodziców adopcyjnych i zastępczych. '
+          'Wgraj skany dokumentów (PDF) – odczytamy je, sprawdzimy, jakie świadczenia z ZUS Ci przysługują, '
+          'i policzymy ich okres oraz wysokość.',
           style: t.bodyLarge,
         ),
         const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Kolory.primaryLight, borderRadius: BorderRadius.circular(6)),
-          child: sesja.zalogowany
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: Kolory.primary, semanticLabel: 'Zalogowano'),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Zalogowano jako ${sesja.dane!.imieINazwisko}.', style: t.bodyLarge),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Sprawdź, co ZUS wie o Twoim ubezpieczeniu.', style: t.bodyLarge),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: () => context.go('/ubezpieczenie'),
-                      icon: const Icon(Icons.health_and_safety_outlined),
-                      label: const Text('Pobierz dane z ZUS'),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Zacznij od zalogowania', style: t.titleLarge),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Zaloguj się przez mObywatel (symulacja), a pobierzemy dane o Twoim ubezpieczeniu z ZUS.',
-                      style: t.bodyLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () => context.go('/logowanie'),
-                      icon: const Icon(Icons.login),
-                      label: const Text('Zaloguj (mObywatel)'),
-                    ),
-                  ],
-                ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: duzyPrzycisk, textStyle: t.titleMedium),
+          onPressed: () => context.push('/dokumenty'),
+          icon: const Icon(Icons.upload_file),
+          label: const Text('Wgraj dokumenty'),
         ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: duzyPrzycisk, textStyle: t.titleMedium),
+          onPressed: vm.maDane ? () => context.push('/swiadczenia') : null,
+          icon: const Icon(Icons.verified_outlined),
+          label: const Text('Zobacz świadczenia'),
+        ),
+        if (!vm.maDane) ...[
+          const SizedBox(height: 8),
+          Text(vm.laduje ? 'Sprawdzamy Twoją sprawę…' : 'Ten przycisk zadziała po wgraniu dokumentów.',
+              style: t.bodyMedium?.copyWith(color: Kolory.tekstDrugorzedny)),
+        ],
+        const SizedBox(height: 32),
+        if (sesja.zalogowany)
+          Row(children: [
+            const Icon(Icons.check_circle, color: Kolory.primary, semanticLabel: 'Zalogowano'),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Zalogowano jako ${sesja.dane!.imieINazwisko} (symulacja mObywatela).',
+                style: t.bodyMedium)),
+          ])
+        else
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/logowanie'),
+              icon: const Icon(Icons.login),
+              label: const Text('Zaloguj (mObywatel)'),
+            ),
+          ),
       ],
     );
   }

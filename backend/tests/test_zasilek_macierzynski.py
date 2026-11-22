@@ -230,8 +230,8 @@ def test_api_anna_ciaza_warunkowo_z_kwota_orientacyjna_art29():
     sid, h = _konto("anna")
     assert _odp(sid, h, sytuacja=["ciaza"], pdp="2027-03-10").status_code == 200
     wyniki = c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()
-    assert [w["swiadczenie"] for w in wyniki] == [URLOP_MACIERZYNSKI, URLOP_RODZICIELSKI, "zasilek_chorobowy_ciaza"]
-    assert wyniki[2]["status"] == "brak_danych" and wyniki[2]["brakujace_pola"][0]["pytanie_id"] == "D1"  # brak zwolnienia
+    # Bez dokumentów i bez zwolnień (ezla) karta „zasiłek chorobowy – brak danych” się nie pokazuje.
+    assert [w["swiadczenie"] for w in wyniki] == [URLOP_MACIERZYNSKI, URLOP_RODZICIELSKI]
     w = wyniki[0]
     assert w["status"] == "warunkowo" and w["scenariusz_id"] == "domyslny" and w["orientacyjny"] is True
     assert w["kwota"] == {"miesieczna": "7075.78", "za_okres": "33020.40", "stawka": "1.00",
@@ -242,6 +242,21 @@ def test_api_anna_ciaza_warunkowo_z_kwota_orientacyjna_art29():
     potw = {x["pytanie_id"] for x in w["pola_do_potwierdzenia"]}
     assert {"O4", "G1"} <= potw  # miesiące z Z-3 i przewidywana data porodu wpisana przez użytkownika
     assert w["kto_wyplaca"] == "platnik" and w["wersja_parametrow"] == "2026-01-01"
+
+
+def test_api_zrodla_danych_i_karta_chorobowego_z_ezla():
+    """„Skąd te dane?”: pola użyte w wyniku z opisem źródła; z ezla karta chorobowego wraca (nawet z brakami)."""
+    sid, h = _konto("anna")
+    _odp(sid, h, sytuacja=["ciaza"], pdp="2027-03-10")
+    w = c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()[0]
+    zrodla = {z["pole"]: z for z in w["zrodla_danych"]}
+    assert zrodla["pdp"]["zrodlo_opis"] == "Twoja odpowiedź" and zrodla["pdp"]["do_sprawdzenia"] is True
+    assert zrodla["okresy_ubezpieczenia"]["kanal"] == "zus_konto" and zrodla["okresy_ubezpieczenia"]["tresc"]
+    assert "data_porodu" not in zrodla                       # pole bez wartości nie jest „źródłem”
+
+    c.post(f"/sprawy/{sid}/zrodla/ezla/pobierz", headers=h)  # zwolnienia z e-ZLA
+    pola = [x["swiadczenie"] for x in c.get(f"/sprawy/{sid}/swiadczenia", headers=h).json()]
+    assert "zasilek_chorobowy_ciaza" in pola
 
 
 def test_api_kasia_po_porodzie_nie_przysluguje_art29():

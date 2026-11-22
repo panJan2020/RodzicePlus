@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'core/config.dart';
+import 'core/magazyn.dart';
+import 'core/magazyn_przegladarki.dart';
 import 'core/router.dart';
 import 'core/session.dart';
 import 'core/theme.dart';
@@ -14,7 +16,10 @@ import 'data/repositories/sprawa_repository.dart';
 /// Korzeń aplikacji: tworzy sesję, klienta API, repozytoria i router (raz, na całe życie aplikacji)
 /// i udostępnia je widokom przez `provider`.
 class App extends StatefulWidget {
-  const App({super.key, this.api});
+  const App({super.key, this.api, this.magazyn});
+
+  /// Do testów: własny magazyn (domyślnie sessionStorage przeglądarki).
+  final MagazynTrwaly? magazyn;
 
   /// Do testów: własny klient API (np. z fałszywym HTTP).
   final ApiClient Function(SesjaAplikacji sesja)? api;
@@ -24,7 +29,7 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> {
-  late final SesjaAplikacji _sesja = SesjaAplikacji();
+  late final SesjaAplikacji _sesja = SesjaAplikacji(magazyn: widget.magazyn ?? magazynPrzegladarki());
   late final ApiClient _api = widget.api?.call(_sesja) ?? ApiClient(_sesja);
   late final AuthRepository _auth = AuthRepository(_api, _sesja);
   late final SprawaRepository _sprawy = SprawaRepository(_api, _sesja);

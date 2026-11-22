@@ -50,6 +50,18 @@ class KwotaWyniku(BaseModel):
     brutto: bool = True
 
 
+class ZrodloDanych(BaseModel):
+    """Pole użyte w wyniku i skąd pochodzi jego aktywna wartość („Skąd te dane?”)."""
+    pole: str
+    tresc: str                       # treść pytania z katalogu
+    zrodlo_opis: str                 # np. „Z-3, str. 7”, „Konto w ZUS”, „Twoja odpowiedź”
+    kanal: str
+    dokument_id: str | None = None
+    strona: int | None = None
+    pewnosc: float = 1.0
+    do_sprawdzenia: bool = False     # niepewny odczyt AI albo deklaracja użytkownika
+
+
 class WynikSwiadczenia(BaseModel):
     swiadczenie: str                 # np. "zasilek_macierzynski_urlop_macierzynski"
     nazwa: str
@@ -74,6 +86,7 @@ class WynikSwiadczenia(BaseModel):
     ryzyka: list[str] = Field(default_factory=list)          # kody ryzyk
     uwagi: list[str] = Field(default_factory=list)           # przybliżenia, założenia, „do potwierdzenia”
     podstawa_prawna: list[str] = Field(default_factory=list)
+    zrodla_danych: list[ZrodloDanych] = Field(default_factory=list)   # pola użyte w wyniku i ich źródła
     wersja_parametrow: str
 
 

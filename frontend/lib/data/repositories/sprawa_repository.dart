@@ -15,13 +15,33 @@ class SprawaRepository {
   /// Źródła, z których pobieramy dane po kliknięciu „Pobierz z ZUS” (symulacja – docs/api.md 2.4).
   static const zrodlaZus = ['zus_konto', 'zus_platnik', 'ezla'];
 
+  Future<String>? _tworzenie;
+
+  /// Czy bieżąca sprawa już istnieje (nie tworzy jej – do ekranów, które tylko sprawdzają stan).
+  bool get maSprawe => _sesja.sprawaId != null;
+
   /// Id bieżącej sprawy – tworzy nową, jeśli jeszcze jej nie ma (anonimową albo zalogowanej osoby).
+  /// Równoległe wywołania (np. logowanie i Start) czekają na to samo utworzenie, więc sprawa jest jedna.
   Future<String> biezacaSprawa() async {
     final istniejaca = _sesja.sprawaId;
     if (istniejaca != null) return istniejaca;
+    return _tworzenie ??= _utworzSprawe().whenComplete(() => _tworzenie = null);
+  }
+
+  Future<String> _utworzSprawe() async {
     final s = Sprawa.fromJson(await _api.post('/sprawy') as Map<String, dynamic>);
     _sesja.ustawSprawe(s.id);
     return s.id;
+  }
+
+  /// Po zalogowaniu: zakłada sprawę i pobiera z (symulowanego) mObywatela dane osobowe. Dane o ubezpieczeniu
+  /// z ZUS użytkownik pobiera osobno („Ubezpieczenie”). Błąd nie przerywa logowania – dane można dodać później.
+  Future<void> przygotujSprawePoLogowaniu() async {
+    try {
+      await pobierzZrodlo('mobywatel');
+    } on ApiException {
+      // sprawa i tak powstała (albo powstanie przy pierwszym użyciu)
+    }
   }
 
   /// Wykonuje zapytanie dla bieżącej sprawy. Gdy serwer jej nie zna (np. restart darmowego

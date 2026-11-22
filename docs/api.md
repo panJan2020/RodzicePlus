@@ -102,7 +102,7 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
 |---|---|---|---|
 | GET | `/swiadczenia` | katalog wszystkich świadczeń → `[SwiadczenieKatalog]` | 5.1, ekran 8 |
 | GET | `/swiadczenia/{kod}` | szczegóły: opis, wymagania, wymagane pola, przepisy | 5.1 |
-| GET | `/sprawy/{id}/swiadczenia?scenariusz=s1` | wyniki dla wszystkich osób sprawy → `[WynikSwiadczenia]`; bez `scenariusz` – scenariusz domyślny | 5.2, ekran 7 |
+| GET | `/sprawy/{id}/swiadczenia?scenariusz=s1` | wyniki dla wszystkich osób sprawy → `[WynikSwiadczenia]`; bez `scenariusz` – scenariusz domyślny. Wynik zasiłku chorobowego w ciąży o statusie `brak_danych` jest pomijany, gdy sprawa nie ma dokumentów ani pola `ezla` (nie pokazujemy karty bez podstaw) | 5.2, ekran 7 |
 
 ### 2.9. Kalkulator i scenariusze
 
@@ -346,6 +346,9 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "ryzyka": ["brak_ubezpieczenia_w_dniu_porodu"],
  "uwagi": ["Kwota orientacyjna – liczona ze średniego wynagrodzenia. …"],   // przybliżenia, założenia, „do potwierdzenia”
  "podstawa_prawna": ["art. 29 ustawy zasiłkowej", "art. 31 ustawy zasiłkowej", "art. 180 Kodeksu pracy"],
+ "zrodla_danych": [{"pole": "miesiace", "tresc": "Wynagrodzenie w kolejnych miesiącach", "zrodlo_opis": "Z-3, str. 7",
+                    "kanal": "upload", "dokument_id": "d2", "strona": 7, "pewnosc": 0.9, "do_sprawdzenia": false}],
+                                 // „Skąd te dane?”: pola użyte w wyniku (tylko te z aktywną wartością) i ich źródła
  "wersja_parametrow": "2026-01-01"}  // wersja obowiązująca w dniu powstania prawa
 ```
 

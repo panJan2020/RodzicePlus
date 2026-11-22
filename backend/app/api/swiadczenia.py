@@ -13,13 +13,13 @@ from app.api.wspolne import login_opcjonalny, osoba_lub_404, sprawa_lub_404
 from app.calculator import podstawa as pw
 from app.calculator import scenariusz, timeline
 from app.domain.model import ROLE_RODZICA, Osoba, Rola, Sprawa
-from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulatora, WynikKalkulatora,
-                                WynikSwiadczenia)
+from app.domain.results import (BrakujacePole, OkresKalkulatora, OsobaKalkulatora, Status, WynikKalkulatora,
+                                WynikSwiadczenia, ZrodloDanych)
 from app.merge.scalanie import prog_pewnosci
 from app.params.store import get_params, parametry_na_dzien
 from app.questions import engine
-from app.rules import DATA_PRAWA, DLA_ROL, REGULY, wyliczone
-from app.rules.wspolne import Kontekst
+from app.rules import DATA_PRAWA, DLA_ROL, POLA_WEJSCIOWE, REGULY, wyliczone
+from app.rules.wspolne import Kontekst, niepewna
 
 router = APIRouter(prefix="/sprawy/{sprawa_id}", tags=["świadczenia i kalkulator"])
 
@@ -57,8 +57,34 @@ def _kontekst(s: Sprawa, o: Osoba) -> tuple[Kontekst, dict[str, Any]]:
 
 @router.get("/swiadczenia", response_model=list[WynikSwiadczenia])
 def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -> list[WynikSwiadczenia]:
-    """Wyniki reguł dla każdego rodzica w sprawie (reguła tylko dla ról, których dotyczy)."""
-    return policz_swiadczenia(sprawa_lub_404(sprawa_id, login))
+    """Wyniki reguł dla każdego rodzica w sprawie (reguła tylko dla ról, których dotyczy).
+
+    Karta „zasiłek chorobowy w ciąży – brak danych” nie jest zwracana, gdy sprawa nie ma dokumentów ani zwolnień
+    (`ezla`) – inaczej każda matka widziałaby świadczenie, którego nic nie wskazuje (CLAUDE.md, etap 3).
+    """
+    s = sprawa_lub_404(sprawa_id, login)
+    return [w for w in policz_swiadczenia(s) if _dotyczy_sprawy(s, w)]
+
+
+def _dotyczy_sprawy(s: Sprawa, w: WynikSwiadczenia) -> bool:
+    if w.swiadczenie != "zasilek_chorobowy_ciaza" or w.status != Status.BRAK_DANYCH:
+        return True
+    osoba = next((o for o in s.osoby if o.id == w.osoba_id), None)
+    return bool(s.dokumenty) or (osoba is not None and osoba.aktywna("ezla") is not None)
+
+
+def _zrodla_danych(kod: str, k: Kontekst) -> list[ZrodloDanych]:
+    """Aktywne wartości pól, z których korzysta reguła – z opisem źródła (dokument i strona dla uploadu)."""
+    wynik = []
+    for pole in POLA_WEJSCIOWE.get(kod, ()):
+        w = k.pochodzenie.get(pole)
+        q = engine.pytanie_dla_pola(pole)
+        if w is None or q is None:
+            continue
+        wynik.append(ZrodloDanych(pole=pole, tresc=q["tresc"], zrodlo_opis=w.zrodlo_opis, kanal=w.kanal.value,
+                                  dokument_id=w.dokument_id, strona=w.strona, pewnosc=w.pewnosc,
+                                  do_sprawdzenia=niepewna(w, k.prog_pewnosci)))
+    return wynik
 
 
 def policz_swiadczenia(s: Sprawa) -> list[WynikSwiadczenia]:
@@ -78,6 +104,7 @@ def policz_swiadczenia(s: Sprawa) -> list[WynikSwiadczenia]:
                     **r.model_dump(exclude={"brakujace", "pola_do_potwierdzenia"}), osoba_id=o.id,
                     scenariusz_id=scenariusz.SCENARIUSZ_DOMYSLNY, brakujace_pola=_brakujace(s, o, r.brakujace),
                     pola_do_potwierdzenia=_do_potwierdzenia(r.pola_do_potwierdzenia),
+                    zrodla_danych=_zrodla_danych(kod, k),
                     wersja_parametrow=pr["obowiazuje_od"]))
     return wyniki
 

@@ -333,6 +333,9 @@ def test_od_dokumentow_do_wyniku_przez_merge_i_api_art4_art92():
     assert [b["pytanie_id"] for b in wynik["brakujace_pola"]] == ["D1a"]       # pytanie o kod B
     assert "D1" in [p["pytanie_id"] for p in wynik["pola_do_potwierdzenia"]]    # nakładanie okresów → do sprawdzenia
     assert wynik["wersja_parametrow"] == "2026-01-01"
+    zrodla = {z["pole"]: z for z in wynik["zrodla_danych"]}               # „Skąd te dane?” – dokument i strona
+    assert zrodla["miesiace"]["dokument_id"] and any(z["strona"] for z in zrodla.values())
+    assert zrodla["miesiace"]["kanal"] == "upload" and "Z-3" in zrodla["miesiace"]["zrodlo_opis"]
 
 
 # ---------- poprawki po 2b: wiek tylko jako zapas, parametry po dacie prawa ----------

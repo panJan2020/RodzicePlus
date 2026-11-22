@@ -402,7 +402,9 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
 ### Etap 3 – Ekrany ścieżki jury
 - [ ] Logowanie → Start → Dokumenty (upload, odczytane dane, porównanie) → Moje świadczenia (wynik z uzasadnieniem).
   (3.1 _(22.11.2026)_: ekran Dokumenty – upload, postęp, lista dokumentów, odczytane pola, porównanie z decyzją ZUS;
-  zostają: logowanie/Start i ekran świadczeń po uploadzie)
+  3.2 _(22.11.2026)_: Moje świadczenia (karta z uzasadnieniem, brakami, „Skąd te dane?”), Start, logowanie jednym przyciskiem,
+  routing z „Wstecz”, sesja i id sprawy w sessionStorage; backend: filtr karty zasiłku chorobowego i `zrodla_danych`.
+  Zostaje 3.3: dopracowanie i ręczny przegląd 375/1440 px)
 - [ ] **Karta „zasiłek chorobowy – brak danych” nie może się wyświetlać każdej matce.** `GET /swiadczenia` zwraca dziś
   wynik zasiłku chorobowego w ciąży także wtedy, gdy matka nie ma zwolnień (status `brak_danych`). Ekran „Moje świadczenia”
   pokazuje kartę świadczenia tylko, gdy jest po co: są zwolnienia (`ezla`) albo użytkownik wskazał sytuację z niezdolnością

@@ -40,6 +40,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   file_picker: ^13.4.1
+  web: ^1.1.2
 
 dev_dependencies:
   flutter_test:

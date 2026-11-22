@@ -155,6 +155,10 @@ const _wynikWarunkowo = {
   'brakujace_pola': [], 'co_zrobic': [], 'orientacyjny': true,
   'pola_do_potwierdzenia': [{'pytanie_id': 'O4', 'tresc': 'Wynagrodzenie w kolejnych miesiącach', 'gdzie_znalezc': 'zaświadczenie Z-3'}],
   'ryzyka': ['brak_ubezpieczenia_w_dniu_porodu'], 'uwagi': ['Kwota orientacyjna – liczona ze średniego wynagrodzenia.'],
+  'zrodla_danych': [
+    {'pole': 'miesiace', 'tresc': 'Wynagrodzenie w kolejnych miesiącach', 'zrodlo_opis': 'Z-3, str. 7', 'kanal': 'upload',
+     'dokument_id': 'd2', 'strona': 7, 'pewnosc': 0.9, 'do_sprawdzenia': false},
+  ],
   'podstawa_prawna': ['art. 29 ustawy zasiłkowej'], 'wersja_parametrow': '2026-01-01',
 };
 
@@ -217,7 +221,7 @@ final fakeSerwer = MockClient((r) async {
     return _json(_zmiana());
   }
   if (p.startsWith('/sprawy/sprawa1/zrodla/') && p.endsWith('/pobierz')) {
-    _pobranoZus = true;
+    if (!p.endsWith('/mobywatel/pobierz')) _pobranoZus = true; // mObywatel to dane osobowe, nie ubezpieczenie
     return _json(_zmiana(dodano: 3));
   }
   if (p == '/sprawy/sprawa1/ubezpieczenie') {
@@ -225,6 +229,8 @@ final fakeSerwer = MockClient((r) async {
         ? _json(_ubezpieczenie(login ?? 'anna'))
         : _json({'detail': 'Nie mamy jeszcze danych o Twoim ubezpieczeniu. Pobierz je z ZUS.'}, 404);
   }
+  if (p == '/sprawy/sprawa1/dokumenty' && r.method == 'GET') return _json([]);
+  if (p == '/sprawy/sprawa1/porownanie') return _json({'detail': 'Ta sprawa nie ma decyzji ZUS do porównania.'}, 404);
   if (p == '/sprawy/sprawa1/swiadczenia') {
     return _json([_wynikWarunkowo, _wynikBrakDanych]);
   }
@@ -252,5 +258,7 @@ Future<void> zalogujJako(WidgetTester tester, String imieINazwisko) async {
   await tester.ensureVisible(find.text(imieINazwisko));
   await tester.pumpAndSettle();
   await tester.tap(find.text(imieINazwisko));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Zaloguj przez mObywatel (symulacja)'));
   await tester.pumpAndSettle();
 }
