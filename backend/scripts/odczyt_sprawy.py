@@ -18,7 +18,9 @@ from app.calculator.okresy_chorobowe import poczatek_niezdolnosci
 from app.domain.model import Kanal, Rola, Sprawa, WartoscPola, Wystawca
 from app.extraction import pipeline
 from app.merge.scalanie import prog_pewnosci
+from app.api.swiadczenia import policz_swiadczenia
 from app.params.store import parametry_na_dzien
+from app.porownanie import porownaj
 from app.questions import engine
 from app.rules.wspolne import Kontekst
 from app.rules.zasilek_chorobowy_ciaza import zasilek_chorobowy_ciaza
@@ -57,6 +59,16 @@ def _wynik_reguly(s: Sprawa) -> None:
         wartosci = getattr(w, nazwa)
         if wartosci:
             print(f"- {nazwa}: {wartosci}")
+
+    print("\n## Porównanie z decyzją ZUS (tylko status)")
+    por = porownaj(s, policz_swiadczenia(s))
+    if por is None:
+        print("(brak decyzji ZUS w sprawie)")
+        return
+    d = por.decyzja_zus
+    print(f"- decyzja ZUS: „{d.tekst}” → {d.rozstrzygniecie} ({d.swiadczenie}), dokument {d.dokument_id}, str. {d.strona}")
+    print(f"- wynik aplikacji: {por.wynik_aplikacji.status.value if por.wynik_aplikacji else '–'}")
+    print(f"- ZGODNOŚĆ: {por.zgodnosc}" + (f" – {' '.join(por.uwagi)}" if por.uwagi else ""))
 
 
 def main(sciezka: str) -> None:

@@ -81,7 +81,7 @@ odczyt AI z pewnością < 0,6 > `uzytkownik`. Pola `plan` – tylko `kreator`.
 
 | ID | Pytanie | Pole | Osoba | Rodzaj | Pokaż, gdy | Po co | Źródła |
 |---|---|---|---|---|---|---|---|
-| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” (okresy z kilku dokumentów tego samego wystawcy scalamy w jedną wartość – sąsiednie i nakładające się; nakładanie to ostrzeżenie, nie konflikt) | `ezla[]` | rodzic (matka) | fakt | A1 ∋ ciąża | 100% z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | ezla, upload:ZAS-53, upload:Z-3 (okresy), upload:ZAS-12, upload:zrzut_zus (e-ZLA; kod tylko z obrazu), kreator |
+| D1 | Zwolnienia lekarskie e-ZLA w ciąży: okresy od–do i czy mają kod „B” (okresy z kilku dokumentów tego samego wystawcy scalamy w jedną wartość – sąsiednie i nakładające się; nakładanie to ostrzeżenie, nie konflikt) | `ezla[]` | rodzic (matka) | fakt | A1 ∋ ciąża | 100% z kodem B (art. 11 ust. 2); okres zasiłkowy 270 dni (art. 8); każdy dzień płatny, także wolny (art. 11 ust. 4) | ezla, upload:ZAS-53, upload:Z-3 (okresy), upload:ZAS-12, kreator |  (zrzut ZUS **nie** jest źródłem zwolnień – odczyt obróconego zrzutu miał pewność ≤ 0,6)
 | D1a | Czy zwolnienie lekarskie ma kod „B” (ciąża)? | `ezla_kod_b` | rodzic (matka) | fakt | A1 ∋ ciąża | kod nie zmienia PRAWA, tylko stawkę: 100% z kodem B, 80% bez niego (art. 11 ust. 2). Pytamy, gdy kodu nie widać na dokumentach – nigdy go nie zgadujemy | kreator |
 | D2 | Czy przed zwolnieniami z kodem B były zwolnienia bez kodu B? Kiedy się skończyły? | `ezla_przed_ciaza[]` | rodzic (matka) | fakt | D1 niepuste | okresów sprzed przerwy nie wlicza się do okresu zasiłkowego, jeśli po przerwie niezdolność przypada w ciąży (art. 9 ust. 2) | ezla, kreator |
 | D3 | Ile dni wynagrodzenia chorobowego wypłacił pracodawca w tym roku kalendarzowym? | `dni_wynagr_chorobowego_rok` | rodzic | fakt | B1 ∋ umowa o pracę | pierwsze 33 dni (14 dni po roku, w którym skończyłaś 50 lat) płaci pracodawca, potem zasiłek (art. 92 KP). **Reguła zasiłku chorobowego tego pola nie używa** (znaczenie do wyjaśnienia – sekcja Z); druk Z-3 nie podaje liczby dni, tylko okresy (D3a) | zus_historia, kreator |
@@ -317,7 +317,7 @@ Jeśli dokument pokazuje, że urlop **już udzielono** (Z-3 pkt 6–7, ZAM), war
 | **Z-3b** (archiwalny) – działalność | pracodawca / uzytkownik | `podstawa_deklarowana[]` |
 | **ZAS-12** – płatnik, dalszy okres | pracodawca | `ezla[]` (kolejne okresy), wypłacone świadczenia |
 | **Poświadczenie ubezpieczenia chorobowego** (wewnętrzny ZUS) | zus | `tytuly`, `chorobowe`, `chorobowe_od`, `okresy_wczesniejsze`, `podstawa_deklarowana[]` / podstawy składek |
-| **Zrzut z systemu ZUS** | zus | okresy ubezpieczenia, tytuły (kod tytułu: 0110, 0411, 0510, 0570 – tytuł z kodu, nie z kontekstu), `ezla[]` (zrzut e-ZLA; kod literowy tylko z obrazu), przyznane świadczenia (`poprzedni_zasilek`, `rodzicielski_wykorzystany`) |
+| **Zrzut z systemu ZUS** | zus | okresy ubezpieczenia, tytuły (kod tytułu: 0110, 0411, 0510, 0570 – tytuł z kodu, nie z kontekstu), przyznane świadczenia (`poprzedni_zasilek`, `rodzicielski_wykorzystany`) |
 | **Akt urodzenia / zgonu** | urzad | dziecko: `data_urodzenia`, `martwe_urodzenie`, `data_zgonu`; `data_porodu`, `liczba_dzieci` |
 | **Zaświadczenie lekarskie** (przewidywana data porodu, ciąża) | lekarz | `pdp`, `ciaza_w_zatrudnieniu` |
 | **Karta informacyjna szpitala** | lekarz | dziecko: `tydzien_ciazy`, `masa_g`, `hospitalizacje[]`; `matka_szpital[]` |

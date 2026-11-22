@@ -167,6 +167,10 @@ Backend – Python FastAPI                                          ▼
     w kluczu `_zrodla` pliku parametrów (podstawa prawna, źródło, status) i dopisujemy do sekcji Z w
     `docs/pytania_kalkulator.md`.
 
+16. **Odmowa („nie przysługuje”) nigdy nie opiera się wyłącznie na wartości odczytanej z dokumentu z pewnością ≤ 0,6**
+    (`rules.wspolne.zlagodz_odmowe`). Wtedy wynik to „warunkowo”, orientacyjny, z polem do potwierdzenia. Próg „niepewny
+    odczyt” (< 0,6) w UI i w hierarchii zostaje bez zmian.
+
 ---
 
 ## 5. Frontend – Flutter Web, MVVM
@@ -290,7 +294,8 @@ Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze te�
 
 - Model z `.env`: `CLAUDE_MODEL` (domyślnie `claude-sonnet-5-5`). Klucz: `ANTHROPIC_API_KEY`.
 - PDF wysyłamy jako blok `document` (base64). Zestawy ZUS to **skany** (bez warstwy tekstowej, częściowo odręczne,
-  częściowo zamazane, niektóre strony obrócone), a Claude widzi strony jako obrazy.
+  częściowo zamazane, niektóre strony obrócone), a Claude widzi strony jako obrazy. Klasyfikacja zwraca kąt `obrot`;
+  dokument z obróconą stroną czytamy z wyprostowanych obrazów PNG 200 DPI (`extraction/pdf.renderuj`), nie z surowego PDF.
 - Odpowiedź w **wymuszonym schemacie JSON** (structured outputs: `output_config.format` = `json_schema`;
   wymuszone narzędzie `tool_choice` daje 400 na nowych modelach). `fallbacks: "default"` – przy odmowie API ponawia
   na innym modelu; logujemy, który model odpowiedział. Schematy per typ dokumentu generowane z `questions/katalog.json`
@@ -390,6 +395,8 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
   (2c _(22.11.2026)_: pracownik z Z-3 i kwota zasiłku chorobowego gotowe, parametry 2024–2025, działalność tylko w prostym
   przypadku (12 miesięcy, próg 60%); art. 48a – bez kwoty z ostrzeżeniem; zleceniobiorca (Z-3a) – do zrobienia)
 - [ ] Porównanie z decyzją ZUS + `tests/golden/run` z tabelą zgodności.
+  (2d minimalne _(22.11.2026)_: `GET /sprawy/{id}/porownanie` i skrypt – tylko status; sprawa Anny: zgodne. Zostaje tabela
+  zgodności ze złotymi wzorcami i porównanie kwot)
 - **Gotowe, gdy:** sprawa Anny daje „przysługuje”, zgodnie z decyzją ZUS.
 
 ### Etap 3 – Ekrany ścieżki jury

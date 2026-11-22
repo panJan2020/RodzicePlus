@@ -38,12 +38,19 @@ def client() -> anthropic.Anthropic:
     return _client
 
 
-def zapytaj(pdf: bytes, polecenie: str, schemat: dict[str, Any], etap: str) -> dict[str, Any]:
-    """Jedno wywołanie: PDF + polecenie → JSON zgodny ze schematem.
+def zapytaj(pdf: bytes, polecenie: str, schemat: dict[str, Any], etap: str,
+            obrazy: list[bytes] | None = None) -> dict[str, Any]:
+    """Jedno wywołanie: PDF (albo `obrazy` PNG – wyprostowane strony) + polecenie → JSON zgodny ze schematem.
 
     Zwraca {"dane": ..., "info": {etap, model, czas_s, tokeny_wejscie, tokeny_wyjscie}}.
     """
     start = time.monotonic()
+    if obrazy:
+        tresc = [{"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                              "data": base64.standard_b64encode(o).decode()}} for o in obrazy]
+    else:
+        tresc = [{"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                                 "data": base64.standard_b64encode(pdf).decode()}}]
     with client().beta.messages.stream(
         model=config.CLAUDE_MODEL,
         max_tokens=32000,
@@ -51,12 +58,7 @@ def zapytaj(pdf: bytes, polecenie: str, schemat: dict[str, Any], etap: str) -> d
         fallbacks="default",
         system=prompts.SYSTEM,
         output_config={"format": {"type": "json_schema", "schema": schemat}},
-        messages=[{"role": "user", "content": [
-            {"type": "document",
-             "source": {"type": "base64", "media_type": "application/pdf",
-                        "data": base64.standard_b64encode(pdf).decode()}},
-            {"type": "text", "text": polecenie},
-        ]}],
+        messages=[{"role": "user", "content": [*tresc, {"type": "text", "text": polecenie}]}],
     ) as strumien:
         resp = strumien.get_final_message()
 

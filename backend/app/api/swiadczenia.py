@@ -58,7 +58,11 @@ def _kontekst(s: Sprawa, o: Osoba) -> tuple[Kontekst, dict[str, Any]]:
 @router.get("/swiadczenia", response_model=list[WynikSwiadczenia])
 def swiadczenia(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -> list[WynikSwiadczenia]:
     """Wyniki reguł dla każdego rodzica w sprawie (reguła tylko dla ról, których dotyczy)."""
-    s = sprawa_lub_404(sprawa_id, login)
+    return policz_swiadczenia(sprawa_lub_404(sprawa_id, login))
+
+
+def policz_swiadczenia(s: Sprawa) -> list[WynikSwiadczenia]:
+    """Wyniki wszystkich reguł dla rodziców sprawy – wspólne dla `/swiadczenia` i `/porownanie`."""
     wyniki = []
     for o in (x for x in s.osoby if x.rola in ROLE_RODZICA):
         k, p = _kontekst(s, o)

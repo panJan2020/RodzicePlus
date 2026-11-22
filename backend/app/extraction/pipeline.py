@@ -19,7 +19,7 @@ from app.extraction.podzial import Fragment, podziel
 from app.extraction.schema import TYPY, WERSJA, WERSJA_KLASYFIKACJI, schemat_klasyfikacji, schemat_odczytu
 
 Postep = Callable[[str, float, str], None]          # (etap, postęp 0–1 w obrębie pliku, komunikat)
-Zapytaj = Callable[[bytes, str, dict[str, Any], str], dict[str, Any]]
+Zapytaj = Callable[..., dict[str, Any]]    # (pdf, polecenie, schemat, etap, obrazy=None) → {"dane", "info"}
 
 
 @dataclass
@@ -46,7 +46,7 @@ def _uzupelnij_strony(strony: list[dict[str, Any]], n: int) -> list[dict[str, An
     po_numerze = {s["strona"]: s for s in strony if isinstance(s.get("strona"), int) and 1 <= s["strona"] <= n}
     return [po_numerze.get(i) or {"strona": i, "typ": "inne", "wariant": None, "strona_formularza": None,
                                   "stron_formularza": None, "poczatek_formularza": True, "osoba": None,
-                                  "obrocona": False}
+                                  "obrocona": False, "obrot": "0"}
             for i in range(1, n + 1)]
 
 
@@ -93,6 +93,11 @@ def _odczytaj(dane: bytes, frag: Fragment, prefiks: str, zapytaj: Zapytaj,
     if schemat is None:
         return None  # dokument bez pól do odczytu (np. „inne”, wniosek o urlop)
     klucz = f"{prefiks}.odczyt.{frag.typ}.{'-'.join(map(str, frag.strony))}"
+    if frag.obroty:   # obrócone strony: prostujemy i renderujemy w wyższej rozdzielczości (zamiast surowego PDF)
+        klucz += f".prosto{pdf.DPI_OBROCONYCH}"
+        return _z_cache(klucz, lambda: zapytaj(b"", prompts.odczyt(frag.typ), schemat, f"odczyt:{frag.typ}",
+                                               obrazy=pdf.renderuj(dane, frag.strony, frag.obroty)),
+                        wywolania, f"odczyt:{frag.typ}")
     return _z_cache(klucz, lambda: zapytaj(pdf.wytnij(dane, frag.strony), prompts.odczyt(frag.typ), schemat,
                                            f"odczyt:{frag.typ}"),
                     wywolania, f"odczyt:{frag.typ}")

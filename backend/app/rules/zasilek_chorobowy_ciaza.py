@@ -24,7 +24,7 @@ from app.calculator import podstawa as pw
 from app.domain.results import KwotaWyniku, OkresWyniku, Powod, Status, Warunek
 from app.formaty import kwota_tekst
 from app.rules import wyliczone
-from app.rules.wspolne import Kontekst, WynikReguly, dni_tekst, kto_wyplaca, pola_niepewne
+from app.rules.wspolne import Kontekst, WynikReguly, dni_tekst, kto_wyplaca, pola_niepewne, zlagodz_odmowe
 
 SWIADCZENIE = "zasilek_chorobowy_ciaza"
 NAZWA = "Zasiłek chorobowy w ciąży"
@@ -39,6 +39,9 @@ WYMAGANE = {
     "stawka": ["ezla", "ezla_kod_b"],
     "wyplata": ["platnik_ponad_20"],
 }
+# Dane, od których zależy odmowa (jeśli któraś jest niepewnym odczytem – wynik „warunkowo”, nie „nie przysługuje”).
+POLA_DECYZJI = ["ezla", "wynagrodzenie_chorobowe_okres", "tytuly", "okresy_ubezpieczenia", "chorobowe", "chorobowe_od",
+                "zatrudnienie_od", "chorobowe_dobrowolne"]
 KOLEJNOSC_TYTULOW = ("umowa_o_prace", "zlecenie", "dzialalnosc", "wspolpraca")
 NAZWY_TYTULOW = {"umowa_o_prace": "umowy o pracę", "zlecenie": "umowy zlecenia", "dzialalnosc": "działalności",
                  "wspolpraca": "współpracy przy działalności"}
@@ -102,6 +105,9 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
         w.podsumowanie = ("Żeby ustalić, czy przysługuje Ci zasiłek chorobowy, potrzebujemy danych o zwolnieniu "
                           "lekarskim i ubezpieczeniu.")
         w.uzasadnienie = ["Brakuje danych: uzupełnij je w „Moich danych” albo wgraj dokumenty."]
+        if "ezla" in w.brakujace:
+            w.co_zrobic = ["Wgraj zwolnienie lekarskie (e-ZLA) albo wniosek ZAS-53 / zaświadczenie Z-3 z datami "
+                           "zwolnienia – bez nich nie ustalimy, czy przysługuje zasiłek chorobowy."]
         return [w]
 
     # ---- 2. ubezpieczenie w dniu początku niezdolności ----
@@ -133,6 +139,7 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
         w.co_zrobic = ["Jeśli niezdolność zaczęła się do 14 dni po zakończeniu ubezpieczenia, zasiłek może jeszcze "
                        "przysługiwać (art. 7 ustawy zasiłkowej) – zapytaj w ZUS.",
                        "Sprawdź na PUE/eZUS, czy okresy ubezpieczenia są kompletne."]
+        zlagodz_odmowe(w, k, POLA_DECYZJI)
         return [w]
     t = min(trwajace, key=lambda x: KOLEJNOSC_TYTULOW.index(x.tytul) if x.tytul in KOLEJNOSC_TYTULOW else 99)
     if len(trwajace) > 1:
@@ -161,6 +168,7 @@ def zasilek_chorobowy_ciaza(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]
         w.powody = [Powod(pole="chorobowe_od", wartosc=baza.isoformat(), komunikat="Nie minął okres wyczekiwania.")]
         w.co_zrobic = ["Jeśli wcześniej miałaś ubezpieczenie chorobowe (np. z poprzedniej umowy z przerwą do 30 dni), "
                        "zapytaj w ZUS, czy wlicza się do okresu wyczekiwania – tego jeszcze nie sprawdzamy."]
+        zlagodz_odmowe(w, k, POLA_DECYZJI)
         return [w]
 
     # ---- 4. dni wynagrodzenia (pracodawca) i zasiłku ----

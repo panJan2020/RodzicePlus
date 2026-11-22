@@ -13,7 +13,7 @@ from typing import Any
 from app import merge
 from app.domain.model import Dokument, Kanal, Osoba, Rola, Sprawa, WartoscPola
 from app.extraction.podzial import Fragment
-from app.extraction.schema import KODY_TYTULU, NIEZNANA, NIEZNANY, POLA_NA_TYTUL, TYPY, opcje_pola
+from app.extraction.schema import KODY_TYTULU, NIEZNANA, NIEZNANY, POLA_NA_TYTUL, TYPY, opcje_pola, pola_typu
 from app.merge.scalanie import prog_pewnosci
 from app.questions import engine
 
@@ -199,7 +199,8 @@ def zapisz_dokument(s: Sprawa, plik: str, frag: Fragment, odczyt: dict[str, Any]
 
     prog = prog_pewnosci()
     # Tytuły trwających okresów z KODU tytułu mają pierwszeństwo przed „tytuly” zgadniętym przez odczyt.
-    odczyt = rozpakuj(odczyt)
+    dozwolone = {q["pole"] for q in pola_typu(t.kod)}      # np. zrzut ZUS nie jest źródłem zwolnień (ezla)
+    odczyt = {pole: v for pole, v in rozpakuj(odczyt).items() if pole in dozwolone}
     okresy = [e for w in odczyt.get("okresy_ubezpieczenia") or [] for e in _okresy_wpisu(w)]
     trwajace = list(dict.fromkeys(e["tytul"] for e in okresy if e["do"] is None))
     if trwajace and odczyt.get("tytuly"):

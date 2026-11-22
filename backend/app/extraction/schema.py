@@ -15,8 +15,8 @@ from typing import Any
 from app.domain.model import Wystawca
 from app.questions.engine import pola_z_dokumentow
 
-WERSJA = "2a-9"            # odczyt pól
-WERSJA_KLASYFIKACJI = "k2"  # klasyfikacja stron  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
+WERSJA = "2a-10"            # odczyt pól
+WERSJA_KLASYFIKACJI = "k3"  # klasyfikacja stron  # zmień przy zmianie promptów lub schematów → unieważnia cache odczytu
 
 
 @dataclass(frozen=True)
@@ -120,6 +120,7 @@ def schemat_klasyfikacji() -> dict[str, Any]:
                                 "description": "strona zaczyna nowy egzemplarz dokumentu (nagłówek, tytuł formularza)"},
         "osoba": _null(_enum(OSOBY)),
         "obrocona": {"type": "boolean"},
+        "obrot": _enum(["0", "90", "180", "270"]),
         "opis": {"type": "string", "description": "kilka słów: czym jest ta strona"},
     })}})
 

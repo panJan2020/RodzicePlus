@@ -17,7 +17,7 @@ from app.calculator import podstawa as pw
 from app.calculator import timeline
 from app.domain.results import KwotaWyniku, OkresWyniku, Powod, Status, Warunek
 from app.rules import wyliczone
-from app.rules.wspolne import (TYTULY_DZIALALNOSC, Kontekst, WynikReguly, gdzie_zlozyc, kto_wyplaca, kwota_tekst,
+from app.rules.wspolne import (zlagodz_odmowe, TYTULY_DZIALALNOSC, Kontekst, WynikReguly, gdzie_zlozyc, kto_wyplaca, kwota_tekst,
                                pola_niepewne, tygodnie_tekst)
 
 URLOP_MACIERZYNSKI = "zasilek_macierzynski_urlop_macierzynski"
@@ -142,6 +142,8 @@ def zasilek_macierzynski(k: Kontekst, p: dict[str, Any]) -> list[WynikReguly]:
                           podstawa_prawna=PRZEPISY[kod] + pr.podstawa_prawna)
               for kod, nazwa in NAZWY.items()]
 
+    for w in wyniki:   # odmowa nie opiera się wyłącznie na niepewnym odczycie (≤ próg) – wtedy „warunkowo”
+        zlagodz_odmowe(w, k, WYMAGANE["prawo"])
     licz = pr.status == Status.PRZYSLUGUJE or (pr.status == Status.WARUNKOWO and pr.ubezpieczona is not False)
     pola_uzyte = list(pr.pola)
     if licz:

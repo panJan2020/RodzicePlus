@@ -35,7 +35,7 @@ def _pusty_pdf(n: int) -> bytes:
 
 def falszywe_zapytaj(wywolane: list[str]):
     """Zamiast Claude: odpowiedzi z fikstury według etapu."""
-    def zapytaj(pdf_bytes, polecenie, schemat, etap):
+    def zapytaj(pdf_bytes, polecenie, schemat, etap, obrazy=None):
         wywolane.append(etap)
         dane = FIKSTURA["klasyfikacja"] if etap == "klasyfikacja" else FIKSTURA["odczyt"][etap.split(":", 1)[1]]
         return {"dane": dane, "info": {"etap": etap, "model": "test", "czas_s": 0, "tokeny_wejscie": 0,

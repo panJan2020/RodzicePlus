@@ -26,6 +26,8 @@ Dla każdej strony podaj też:
   pierwsza strona pisma); jeden plik może zawierać kilka egzemplarzy tego samego formularza,
 - osoba – czyje dane dotyczy strona (matka, ojciec, dziecko), jeśli to widać; inaczej null,
 - obrocona – czy strona jest obrócona,
+- obrot – o ile stopni trzeba obrócić stronę ZGODNIE Z RUCHEM WSKAZÓWEK ZEGARA, żeby tekst był poziomy i czytelny
+  od lewej do prawej („0”, „90”, „180” albo „270”; „0”, gdy strona jest już w pionie),
 - opis – kilka słów, czym jest strona (np. „koperta”, „załącznik – kopia dowodu”, „pusta strona”); przy typie „inne”
   opis jest obowiązkowy i konkretny. Nie zmieniaj strony na znany typ, jeśli nie jesteś pewien.
 

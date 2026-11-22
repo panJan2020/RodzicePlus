@@ -278,7 +278,7 @@ POST /sprawy/{id}/dokumenty (PDF, wiele plików)
 | Skany bez warstwy tekstowej, pismo odręczne, zamazane dane | PDF jako blok `document` (Claude widzi strony jako obrazy); `pewnosc`; wartości < 0,6 oznaczone w UI |
 | Jeden PDF = wiele dokumentów, w tym kilka egzemplarzy tego samego formularza | Najpierw klasyfikacja stron, potem podział na egzemplarze, dopiero potem odczyt pól |
 | Wynik sprawy w różnych miejscach pliku | Rozpoznawanie strony wyniku po treści; `oczekiwany_wynik` nigdy jako dane wejściowe |
-| Strony obrócone (np. zrzut systemu ZUS) | Prompt: „strona może być obrócona”; w razie problemów obracanie przed wysłaniem |
+| Strony obrócone (np. zrzut systemu ZUS) | Klasyfikacja zwraca kąt `obrot` (0/90/180/270 zgodnie z ruchem wskazówek zegara); dokument z obróconą stroną czytamy z obrazów PNG po wyprostowaniu, w 200 DPI (PyMuPDF), zamiast z surowego PDF |
 | Czas odpowiedzi 30–90 s | Zadanie w tle + polling + komunikat „to może potrwać do 2 minut” |
 | Koszt i limity API | Klasyfikacja raz na plik + jeden odczyt na dokument; zapisywanie zużycia tokenów i modelu; cache wyników po hashu pliku (`data/cache/`) |
 | Halucynacje | „Tylko to, co widać”, schemat z `enum`, weryfikacja przez użytkownika, porównanie z decyzją ZUS |

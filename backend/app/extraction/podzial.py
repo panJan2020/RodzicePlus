@@ -21,6 +21,7 @@ class Fragment:
     wariant: str | None = None
     stron_formularza: int | None = None
     osoby: list[str] = field(default_factory=list)
+    obroty: dict[int, int] = field(default_factory=dict)   # strona → kąt do wyprostowania (tylko niezerowe)
     _ostatni_x: int | None = None
 
     @property
@@ -61,4 +62,6 @@ def podziel(strony: list[dict[str, Any]]) -> list[Fragment]:
             cur._ostatni_x = s["strona_formularza"]
         if s.get("osoba"):
             cur.osoby.append(s["osoba"])
+        if int(s.get("obrot") or 0):
+            cur.obroty[s["strona"]] = int(s["obrot"])
     return wynik

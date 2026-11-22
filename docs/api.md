@@ -274,10 +274,12 @@ Odczytane pola do potwierdzenia = wartości z `kanal: "upload"` w `GET /sprawy/{
  "liczba_pol": 14, "do_sprawdzenia": 1,   // do_sprawdzenia = wartości z pewnością < 0,6
  "informacja": []}                // pismo ZUS: czego brakuje (bez danych osobowych)
 
-// Porownanie – GET /sprawy/{id}/porownanie
+// Porownanie – GET /sprawy/{id}/porownanie (wersja minimalna: tylko status, bez kwot; 404 bez decyzji ZUS)
+// rozstrzygniecie: przyznano | odmowa (rozpoznane słowami kluczowymi w kodzie, bez AI); wynik warunkowy albo
+// brak_danych → zgodnosc "nie_do_porownania"
 {"decyzja_zus": {"tekst": "W sprawie przyznano zasiłek chorobowy.", "dokument_id": "d7", "strona": 38,
                  "swiadczenie": "zasilek_chorobowy_ciaza", "rozstrzygniecie": "przyznano", "kwota": null},
- "wynik_aplikacji": {"swiadczenie": "zasilek_chorobowy_ciaza", "status": "przysluguje", "kwota": "…"},
+ "wynik_aplikacji": {"swiadczenie": "zasilek_chorobowy_ciaza", "status": "przysluguje", "kwota": null},
  "zgodnosc": "zgodne",            // zgodne | rozne | nie_do_porownania
  "uwagi": []}
 ```

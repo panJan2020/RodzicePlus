@@ -9,7 +9,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 
 from app.api.wspolne import Obserwator, ZmianaDanych, login_opcjonalny, sprawa_lub_404
 from app.config import MAX_UPLOAD_MB
+from app.api.swiadczenia import policz_swiadczenia
 from app.domain.model import Dokument
+from app.domain.results import Porownanie
+from app import porownanie as porownaj_z_decyzja
 from app.extraction import mapowanie, pdf, pipeline
 from app.storage import memory
 
@@ -84,3 +87,13 @@ def usun_dokument(sprawa_id: str, dokument_id: str, login: str | None = Depends(
         raise HTTPException(404, "W tej sprawie nie ma takiego dokumentu.")
     memory.zapisz(s)
     return obs.zmiana()
+
+
+@router.get("/{sprawa_id}/porownanie")
+def porownanie(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -> Porownanie:
+    """Wynik aplikacji vs decyzja ZUS ze sprawy testowej (tylko status: przysługuje / nie przysługuje)."""
+    s = sprawa_lub_404(sprawa_id, login)
+    wynik = porownaj_z_decyzja.porownaj(s, policz_swiadczenia(s))
+    if wynik is None:
+        raise HTTPException(404, "Ta sprawa nie ma decyzji ZUS do porównania.")
+    return wynik

@@ -106,3 +106,26 @@ class WynikKalkulatora(BaseModel):
     orientacyjny: bool = False
     ostrzezenia: list[str] = Field(default_factory=list)
     bledy_wyborow: list[str] = Field(default_factory=list)
+
+
+class DecyzjaZus(BaseModel):
+    """Decyzja ZUS ze sprawy testowej – tylko do porównania, nigdy dane wejściowe reguł."""
+    tekst: str
+    dokument_id: str | None = None
+    strona: int | None = None
+    swiadczenie: str | None = None       # np. "zasilek_chorobowy_ciaza"; None – nie rozpoznano
+    rozstrzygniecie: str | None = None   # przyznano | odmowa; None – nie rozpoznano
+    kwota: str | None = None             # na razie zawsze None (porównujemy tylko status)
+
+
+class WynikPorownania(BaseModel):
+    swiadczenie: str
+    status: Status
+    kwota: str | None = None
+
+
+class Porownanie(BaseModel):
+    decyzja_zus: DecyzjaZus
+    wynik_aplikacji: WynikPorownania | None = None
+    zgodnosc: str                        # zgodne | rozne | nie_do_porownania
+    uwagi: list[str] = Field(default_factory=list)

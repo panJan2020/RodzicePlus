@@ -62,6 +62,24 @@ def pola_niepewne(k: Kontekst, pola: list[str]) -> list[str]:
     return [p for p in dict.fromkeys(pola) if p in k.pochodzenie and niepewna(k.pochodzenie[p], k.prog_pewnosci)]
 
 
+def zlagodz_odmowe(w: "WynikReguly", k: Kontekst, pola: list[str]) -> bool:
+    """Odmowa („nie przysługuje”) nie może opierać się na wartości odczytanej z dokumentu z pewnością ≤ progu
+    (≤, nie <: próg „niepewny odczyt” zostaje bez zmian). Wtedy wynik to „warunkowo” z polami do potwierdzenia."""
+    niskie = [p for p in dict.fromkeys(pola) if p in k.pochodzenie and k.pochodzenie[p].kanal == Kanal.UPLOAD
+              and k.pochodzenie[p].pewnosc <= k.prog_pewnosci]
+    if w.status != Status.NIE_PRZYSLUGUJE or not niskie:
+        return False
+    w.status = Status.WARUNKOWO
+    w.orientacyjny = True
+    w.pola_do_potwierdzenia = list(dict.fromkeys(w.pola_do_potwierdzenia + niskie))
+    w.warunki.append(Warunek(opis="Dane, na których opiera się odmowa, odczytaliśmy z dokumentu z małą pewnością – "
+                                  "sprawdź je i popraw, jeśli są błędne"))
+    w.uwagi.append("Odmowa opiera się na danych odczytanych z dokumentu z małą pewnością, dlatego wynik jest "
+                   "warunkowy, a nie ostateczny. Sprawdź: " + ", ".join(niskie) + ".")
+    w.podsumowanie = "Do sprawdzenia – " + w.podsumowanie
+    return True
+
+
 def kto_wyplaca(f: dict[str, Any], p: dict[str, Any]) -> tuple[str | None, str, bool]:
     """C2 (art. 61): (kto, opis, czy brakuje odpowiedzi C1). Płatnik zgłaszający ponad próg osób wypłaca sam."""
     tytuly = f.get("tytuly") or []
