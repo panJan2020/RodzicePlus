@@ -92,6 +92,7 @@ class Sprawa(BaseModel):
     nazwa: str = "Moja sprawa"
     zdarzenie: str = "urodzenie"      # urodzenie | przysposobienie | rodzina_zastepcza
     utworzono: datetime = Field(default_factory=_teraz)
+    wlasciciel: str | None = None     # login osoby zalogowanej; None = sprawa anonimowa
     osoby: list[Osoba] = Field(default_factory=list)
     dokumenty: list[str] = Field(default_factory=list)
     # Wynik ze strony decyzji ZUS – TYLKO do porównania/testów, nigdy jako dane wejściowe.

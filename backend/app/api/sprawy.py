@@ -1,79 +1,181 @@
-"""Sprawy: profil, odpowiedzi z kwestionariusza, upload dokumentów (FR-03, FR-28)."""
+"""Sprawy i osoby, dane osoby (drzewo pytań), kreator, odpowiedzi użytkownika, upload dokumentów (docs/api.md 2.2–2.3, 2.6).
+
+Sprawa może być anonimowa (bez logowania) – wtedy o1 ma `zalogowana: false`. Sprawa zalogowanej osoby
+jest dostępna tylko z jej tokenem.
+"""
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from app import merge, sources
+from app.api.wspolne import (Liczniki, Obserwator, ZmianaDanych, liczniki, login_opcjonalny, osoba_lub_404,
+                             sprawa_lub_404)
 from app.config import MAX_UPLOAD_MB
-from app.domain.profile import FieldValue, Sprawa, Zrodlo
-from app.extraction import claude_client, merge
+from app.domain.model import Kanal, Rola, Sprawa, WartoscPola, Wystawca
+from app.extraction import claude_client, mapowanie
 from app.questions import engine
 from app.storage import memory
 
 router = APIRouter(prefix="/sprawy", tags=["sprawy"])
 
+ZDARZENIA = ("urodzenie", "przysposobienie", "rodzina_zastepcza")
 
-def _sprawa(sprawa_id: str) -> Sprawa:
-    s = memory.pobierz(sprawa_id)
-    if not s:
-        raise HTTPException(404, "Nie ma takiej sprawy.")
-    return s
+
+class OsobaApi(BaseModel):
+    id: str
+    rola: Rola
+    imie: str | None = None
+    zalogowana: bool
+
+
+class SprawaSkrot(BaseModel):
+    id: str
+    nazwa: str
+    zdarzenie: str
+    utworzono: datetime
+
+
+class SprawaApi(SprawaSkrot):
+    osoby: list[OsobaApi]
+    liczniki: dict[str, int]
+    ma_decyzje_zus: bool
+
+
+class NowaSprawa(BaseModel):
+    zdarzenie: str = "urodzenie"
+    nazwa: str = "Moja sprawa"
+
+
+class NowaOsoba(BaseModel):
+    rola: Rola
+    imie: str | None = None
 
 
 class Odpowiedz(BaseModel):
+    osoba: str | None = None  # osoba_id; brak = wnioskodawca
     pole: str
     wartosc: Any
-    osoba: int = 0  # indeks osoby w sprawie
 
 
-@router.post("", response_model=Sprawa)
-def utworz() -> Sprawa:
-    return memory.nowa_sprawa()
+def _sprawa_api(s: Sprawa) -> SprawaApi:
+    lic: Liczniki = liczniki(s)
+    return SprawaApi(id=s.id, nazwa=s.nazwa, zdarzenie=s.zdarzenie, utworzono=s.utworzono,
+                     osoby=[OsobaApi(id=o.id, rola=o.rola, imie=o.imie, zalogowana=o.zalogowana) for o in s.osoby],
+                     liczniki={**lic.model_dump(), "dokumenty": len(s.dokumenty)},
+                     ma_decyzje_zus=s.oczekiwany_wynik is not None)
 
 
-@router.get("/{sprawa_id}", response_model=Sprawa)
-def pobierz(sprawa_id: str) -> Sprawa:
-    return _sprawa(sprawa_id)
+@router.get("", response_model=list[SprawaSkrot])
+def lista(login: str | None = Depends(login_opcjonalny)) -> list[SprawaSkrot]:
+    if not login:
+        raise HTTPException(401, "Zaloguj się, aby zobaczyć swoje sprawy.")
+    return [SprawaSkrot(id=s.id, nazwa=s.nazwa, zdarzenie=s.zdarzenie, utworzono=s.utworzono)
+            for s in memory.lista(login)]
 
 
-@router.post("/{sprawa_id}/odpowiedzi", response_model=Sprawa)
-def zapisz_odpowiedzi(sprawa_id: str, odpowiedzi: list[Odpowiedz]) -> Sprawa:
-    s = _sprawa(sprawa_id)
-    for o in odpowiedzi:
-        pola = _osoba(s, o.osoba).pola
-        if o.wartosc is None:  # „Wyczyść odpowiedź”
-            pola.pop(o.pole, None)
-            continue
-        pola[o.pole] = FieldValue(wartosc=o.wartosc, zrodlo=Zrodlo.UZYTKOWNIK,
-                                                   potwierdzone=True)
+@router.post("", response_model=SprawaApi)
+def utworz(dane: NowaSprawa | None = None, login: str | None = Depends(login_opcjonalny)) -> SprawaApi:
+    """Nowa sprawa. Zalogowana osoba (albo anonimowa o1) jest dodawana automatycznie;
+    przy zdarzeniu „urodzenie” od razu dodajemy osobę `dziecko` (o2)."""
+    dane = dane or NowaSprawa()
+    if dane.zdarzenie not in ZDARZENIA:
+        raise HTTPException(422, "Nieznany rodzaj sprawy.")
+    s = memory.nowa_sprawa(dane.zdarzenie, dane.nazwa, wlasciciel=login)
+    konto = sources.konto(login) if login else None
+    s.dodaj_osobe(Rola.MATKA, konto["imie"] if konto else None, zalogowana=bool(login), login=login)
+    if dane.zdarzenie == "urodzenie":
+        s.dodaj_osobe(Rola.DZIECKO, "Dziecko")
     memory.zapisz(s)
-    return s
+    return _sprawa_api(s)
 
 
-def _osoba(s: Sprawa, osoba: int):
-    if not 0 <= osoba < len(s.osoby):
-        raise HTTPException(404, "W tej sprawie nie ma takiej osoby.")
-    return s.osoby[osoba]
+@router.get("/{sprawa_id}", response_model=SprawaApi)
+def pobierz(sprawa_id: str, login: str | None = Depends(login_opcjonalny)) -> SprawaApi:
+    return _sprawa_api(sprawa_lub_404(sprawa_id, login))
 
 
-@router.get("/{sprawa_id}/pytania")
-def nastepne_pytania(sprawa_id: str, osoba: int = 0) -> list[dict]:
-    """Dla kreatora: pytania aktywne (warunki spełnione) i jeszcze bez odpowiedzi."""
-    return engine.nastepne_pytania(_osoba(_sprawa(sprawa_id), osoba))
+@router.post("/{sprawa_id}/osoby", response_model=OsobaApi)
+def dodaj_osobe(sprawa_id: str, dane: NowaOsoba, login: str | None = Depends(login_opcjonalny)) -> OsobaApi:
+    s = sprawa_lub_404(sprawa_id, login)
+    if dane.rola == Rola.MATKA:
+        raise HTTPException(422, "Można dodać ojca, drugiego rodzica albo dziecko.")
+    o = s.dodaj_osobe(dane.rola, dane.imie)
+    memory.zapisz(s)
+    return OsobaApi(id=o.id, rola=o.rola, imie=o.imie, zalogowana=o.zalogowana)
+
+
+@router.delete("/{sprawa_id}/osoby/{osoba_id}", status_code=204)
+def usun_osobe(sprawa_id: str, osoba_id: str, login: str | None = Depends(login_opcjonalny)) -> None:
+    s = sprawa_lub_404(sprawa_id, login)
+    o = osoba_lub_404(s, osoba_id)
+    if o is s.wnioskodawca():
+        raise HTTPException(400, "Nie można usunąć osoby, która prowadzi sprawę.")
+    s.osoby.remove(o)
+    memory.zapisz(s)
 
 
 @router.get("/{sprawa_id}/dane", response_model=engine.DaneOsoby)
-def dane(sprawa_id: str, osoba: int = 0) -> engine.DaneOsoby:
-    """Zakładka „Dane”: całe drzewo pytań ze stanem (aktywne / zablokowane / wykluczone),
-    aktualną wartością i jej źródłem. Edycja przez POST /odpowiedzi."""
-    return engine.dane_osoby(_osoba(_sprawa(sprawa_id), osoba), osoba)
+def dane(sprawa_id: str, osoba: str | None = None, login: str | None = Depends(login_opcjonalny)) -> engine.DaneOsoby:
+    """„Moje dane”: wszystkie pytania osoby w sekcjach, ze stanem i wartościami ze wszystkich źródeł."""
+    s = sprawa_lub_404(sprawa_id, login)
+    return engine.dane_osoby(s, osoba_lub_404(s, osoba))
 
 
-def _przetworz(zid: str, sprawa_id: str, pdf: bytes) -> None:
+@router.get("/{sprawa_id}/pytania", response_model=list[engine.Pytanie])
+def nastepne_pytania(sprawa_id: str, osoba: str | None = None,
+                     login: str | None = Depends(login_opcjonalny)) -> list[engine.Pytanie]:
+    """Kreator: pytania aktywne, bez aktywnej wartości, na które użytkownik może odpowiedzieć."""
+    s = sprawa_lub_404(sprawa_id, login)
+    return engine.nastepne_pytania(s, osoba_lub_404(s, osoba))
+
+
+@router.post("/{sprawa_id}/odpowiedzi", response_model=ZmianaDanych)
+def zapisz_odpowiedzi(sprawa_id: str, odpowiedzi: list[Odpowiedz],
+                      login: str | None = Depends(login_opcjonalny)) -> ZmianaDanych:
+    """Dodaje albo zmienia wartość UŻYTKOWNIKA. `wartosc: null` usuwa tylko wartość użytkownika.
+
+    Gdy pole ma już wartość z innego źródła, odpowiedź użytkownika staje się aktywna z wyboru ręcznego
+    (`wybor_aktywnej: uzytkownik`) – wartość z innego źródła zostaje, a konflikt jest widoczny.
+    """
+    s = sprawa_lub_404(sprawa_id, login)
+    obs = Obserwator(s)
+    for o in odpowiedzi:
+        osoba = osoba_lub_404(s, o.osoba)
+        q = engine.pytanie_dla_pola(o.pole)
+        if q is None:
+            raise HTTPException(400, f"Nie znamy pola „{o.pole}”.")
+        if not engine.dotyczy(q, s, osoba):
+            raise HTTPException(400, f"Pytanie „{q['tresc']}” nie dotyczy tej osoby.")
+        if not engine.edytowalne(q):
+            raise HTTPException(400, f"Na pytanie „{q['tresc']}” nie można odpowiedzieć ręcznie.")
+        if o.wartosc is None:
+            merge.usun(osoba, o.pole, Kanal.KREATOR)
+            continue
+        try:
+            wartosc = engine.normalizuj(q, o.wartosc)
+        except engine.BlednaOdpowiedz as e:
+            raise HTTPException(422, f"{q['tresc']}: {e}") from None
+        inne_zrodla = any(w.kanal != Kanal.KREATOR for w in osoba.pola.get(o.pole, []))
+        nowa = merge.dodaj(s, osoba, o.pole, WartoscPola(wartosc=wartosc, wystawca=Wystawca.UZYTKOWNIK,
+                                                         kanal=Kanal.KREATOR, zrodlo_opis="Twoja odpowiedź"),
+                           rodzaj=q["rodzaj"])
+        if inne_zrodla:
+            merge.ustaw_recznie(osoba, o.pole, nowa.id)
+        if o.pole == "rola":
+            osoba.rola = engine.rola_z_odpowiedzi(osoba.wartosc("rola"))
+    memory.zapisz(s)
+    return obs.zmiana()
+
+
+# ---------- upload (odczyt skanów) – pełna wersja w etapie 2 ----------
+
+def _przetworz(zid: str, sprawa_id: str, pdf: bytes, plik: str) -> None:
     try:
         wynik = claude_client.odczytaj_pdf(pdf)
         s = memory.pobierz(sprawa_id)
-        merge.scal(s, wynik["dane"])
+        mapowanie.zapisz_odczyt(s, wynik["dane"], plik)
         memory.zapisz(s)
         memory.aktualizuj_zadanie(zid, status="gotowe", strony=wynik["dane"].get("strony"),
                                   uwagi=wynik["dane"].get("uwagi"), tokeny=wynik["uzycie_tokenow"])
@@ -82,23 +184,17 @@ def _przetworz(zid: str, sprawa_id: str, pdf: bytes) -> None:
 
 
 @router.post("/{sprawa_id}/dokumenty", status_code=202)
-async def wgraj_dokument(sprawa_id: str, tlo: BackgroundTasks, plik: UploadFile = File(...)) -> dict:
-    """Odczyt skanu trwa kilkadziesiąt sekund → zwracamy id zadania, Flutter odpytuje /zadania/{id}."""
-    s = _sprawa(sprawa_id)
+async def wgraj_dokument(sprawa_id: str, tlo: BackgroundTasks, plik: UploadFile = File(...),
+                         login: str | None = Depends(login_opcjonalny)) -> dict:
+    """Odczyt skanu trwa kilkadziesiąt sekund → zwracamy id zadania, Flutter odpytuje GET /zadania/{id}."""
+    s = sprawa_lub_404(sprawa_id, login)
     if plik.content_type != "application/pdf":
         raise HTTPException(415, "Obsługujemy tylko PDF")
-    dane = await plik.read()
-    if len(dane) > MAX_UPLOAD_MB * 1024 * 1024:
+    dane_pliku = await plik.read()
+    if len(dane_pliku) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"Plik większy niż {MAX_UPLOAD_MB} MB")
-    s.dokumenty.append(plik.filename or "dokument.pdf")
-    zid = memory.nowe_zadanie(sprawa_id, plik.filename or "")
-    tlo.add_task(_przetworz, zid, sprawa_id, dane)
+    nazwa = plik.filename or "dokument.pdf"
+    s.dokumenty.append(nazwa)
+    zid = memory.nowe_zadanie(sprawa_id, nazwa)
+    tlo.add_task(_przetworz, zid, sprawa_id, dane_pliku, nazwa)
     return {"zadanie_id": zid}
-
-
-@router.get("/zadania/{zadanie_id}")
-def status_zadania(zadanie_id: str) -> dict:
-    z = memory.zadanie(zadanie_id)
-    if not z:
-        raise HTTPException(404, "Nie ma takiego zadania")
-    return z

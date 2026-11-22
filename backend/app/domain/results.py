@@ -1,4 +1,8 @@
-"""Wyniki zwracane przez reguły i kalkulator."""
+"""Wyniki zwracane przez API świadczeń i kalkulatora (docs/api.md 3.6–3.7).
+
+Kod zwraca PODZBIÓR pól z kontraktu – pola, których jeszcze nie liczymy (np. okres i kwota w wyniku świadczenia,
+scenariusze), dochodzą razem z regułami. Kwoty i stawki zawsze jako tekst ("1234.56", "0.815").
+"""
 from datetime import date
 from enum import Enum
 
@@ -11,37 +15,55 @@ class Status(str, Enum):
     BRAK_DANYCH = "brak_danych"
 
 
-class BrakujacePytanie(BaseModel):
-    id: str                          # ID pytania z katalogu, np. "B5" (link do zakładki Dane)
+class BrakujacePole(BaseModel):
+    pytanie_id: str                  # ID pytania z katalogu, np. "B5" (link do „Moich danych”)
     tresc: str
     gdzie_znalezc: str | None = None # np. "zaświadczenie Z-3, pkt 11"
 
 
-class WynikUprawnienia(BaseModel):
+class Powod(BaseModel):
+    pole: str
+    wartosc: str | None = None
+    komunikat: str
+
+
+class WynikSwiadczenia(BaseModel):
     swiadczenie: str                 # np. "zasilek_macierzynski"
+    nazwa: str
+    osoba_id: str
     status: Status
     uzasadnienie: list[str] = Field(default_factory=list)   # zdania dla użytkownika
+    powody: list[Powod] = Field(default_factory=list)        # przy nie_przysluguje
+    brakujace_pola: list[BrakujacePole] = Field(default_factory=list)  # przy brak_danych
+    kto_wyplaca: str | None = None   # "platnik" | "zus"
+    kto_wyplaca_opis: str | None = None
     podstawa_prawna: list[str] = Field(default_factory=list)
-    brakujace_pola: list[str] = Field(default_factory=list)  # ID pytań do uzupełnienia, np. ["A1", "B7"]
-    brakujace_pytania: list[BrakujacePytanie] = Field(default_factory=list)  # to samo z treścią – do UI
-    ostrzezenia: list[str] = Field(default_factory=list)     # ryzyka (FR-22)
-    kto_wyplaca: str | None = None   # "pracodawca" / "ZUS" (FR-20)
+    wersja_parametrow: str
 
 
-class Okres(BaseModel):
-    rodzaj: str          # "macierzynski", "rodzicielski", "ojcowski", ...
-    osoba: str           # "matka" / "ojciec"
+class OkresKalkulatora(BaseModel):
+    rodzaj: str          # "macierzynski", "rodzicielski", ...
+    osoba_id: str | None # None – drugi rodzic, którego nie ma jeszcze w sprawie
     od: date
     do: date
-    stawka: float
-    kwota_miesieczna: float
-    kwota_za_okres: float
+    tygodnie: int
+    stawka: str
+    kwota_miesieczna: str
+    kwota_za_okres: str
     uwagi: list[str] = Field(default_factory=list)
 
 
+class OsobaKalkulatora(BaseModel):
+    osoba_id: str
+    podstawa_wymiaru: str
+    suma: str
+
+
 class WynikKalkulatora(BaseModel):
-    podstawa_wymiaru: float
-    okresy: list[Okres]
-    suma: float
-    ostrzezenia: list[str] = Field(default_factory=list)
+    scenariusz_id: str
     wersja_parametrow: str
+    osoby: list[OsobaKalkulatora]
+    okresy: list[OkresKalkulatora]
+    suma: str
+    ostrzezenia: list[str] = Field(default_factory=list)
+    bledy_wyborow: list[str] = Field(default_factory=list)

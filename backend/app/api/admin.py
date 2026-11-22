@@ -1,4 +1,4 @@
-"""Panel administracyjny – edycja parametrów prawnych (FR-30)."""
+"""Panel administracyjny – edycja parametrów prawnych (docs/opis_aplikacji.md, rozdz. 10)."""
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException

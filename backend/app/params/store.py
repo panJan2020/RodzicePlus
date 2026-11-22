@@ -1,4 +1,4 @@
-"""Parametry prawne wersjonowane datą obowiązywania (FR-30).
+"""Parametry prawne wersjonowane datą obowiązywania (docs/opis_aplikacji.md, rozdz. 10).
 
 Każdy plik params_RRRR.json ma pole "obowiazuje_od". Do wyliczeń bierzemy wersję
 obowiązującą w dniu powstania prawa do świadczenia – nie "najnowszą".

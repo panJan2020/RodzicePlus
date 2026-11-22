@@ -32,7 +32,7 @@ def tool_definition() -> dict[str, Any]:
                     "type": "array",
                     "items": {"type": "object", "properties": {
                         "pole": {"type": "string", "enum": list(pola)},
-                        "osoba": {"type": "string", "enum": ["matka", "ojciec", "inna"]},
+                        "osoba": {"type": "string", "enum": ["matka", "ojciec", "dziecko"]},
                         "wartosc": {"description": "string, liczba, bool albo lista stringów"},
                         "dokument": {"type": "string", "enum": TYPY_DOKUMENTOW},
                         "strona": {"type": "integer"},

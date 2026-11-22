@@ -1,4 +1,4 @@
-"""Symulowane logowanie przez mObywatela (FR-01). Bez prawdziwej integracji – zgodnie z treścią zadania.
+"""Symulowane logowanie przez mObywatela (docs/opis_aplikacji.md, rozdz. 9). Bez prawdziwej integracji – zgodnie z treścią zadania.
 
 Przepływ:
   1. GET  /auth/mobywatel/konta  → lista fikcyjnych kont testowych (do wyboru na ekranie logowania),
@@ -19,7 +19,7 @@ PREFIKS_TOKENU = "sim-"
 
 
 class LoginRequest(BaseModel):
-    uzytkownik: str  # login konta testowego, np. "anna"
+    login: str  # login konta testowego, np. "anna"
 
 
 class KontoTestowe(BaseModel):
@@ -34,6 +34,7 @@ class Sesja(BaseModel):
     login: str
     imie: str
     nazwisko: str
+    admin: bool = False
 
 
 def _konta() -> dict[str, dict]:
@@ -61,9 +62,9 @@ def konta_testowe() -> list[KontoTestowe]:
 
 @router.post("/mobywatel", response_model=Sesja)
 def zaloguj(req: LoginRequest) -> Sesja:
-    if req.uzytkownik not in _konta():
+    if req.login not in _konta():
         raise HTTPException(404, "Nie ma takiego konta testowego.")
-    return _sesja(req.uzytkownik)
+    return _sesja(req.login)
 
 
 @router.get("/ja", response_model=Sesja)

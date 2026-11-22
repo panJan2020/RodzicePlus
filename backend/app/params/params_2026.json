@@ -1,6 +1,6 @@
 {
   "obowiazuje_od": "2026-01-01",
-  "opis": "Parametry prawne – edytowalne w panelu admina (FR-30). Zrodla: zalacznik ZUS, KP, ustawa zasilkowa.",
+  "opis": "Parametry prawne – edytowalne w panelu admina (docs/opis_aplikacji.md, rozdz. 10). Zrodla: zalacznik ZUS, KP, ustawa zasilkowa.",
   "urlop_macierzynski_tyg": {"1": 20, "2": 31, "3": 33, "4": 35, "5": 37},
   "urlop_na_warunkach_min_tyg": 9,
   "urlop_rodzicielski_tyg": {"1": 41, "2": 43},
