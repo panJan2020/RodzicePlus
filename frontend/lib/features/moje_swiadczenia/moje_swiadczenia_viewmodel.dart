@@ -21,7 +21,10 @@ class MojeSwiadczeniaViewModel extends ChangeNotifier {
     blad = null;
     notifyListeners();
     try {
-      wyniki = await _sprawy.swiadczenia();
+      // Najpierw to, co już ustalone; „brakuje danych” na końcu (sortowanie stabilne – kolejność reguł zostaje).
+      final lista = await _sprawy.swiadczenia();
+      bool brak(WynikSwiadczenia w) => w.status == StatusSwiadczenia.brakDanych;
+      wyniki = [...lista.where((w) => !brak(w)), ...lista.where(brak)];
     } on ApiException catch (e) {
       blad = e.komunikat;
     } finally {

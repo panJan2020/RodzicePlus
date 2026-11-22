@@ -9,7 +9,7 @@ class Responsive {
   static const double komputerOd = 1024;
 
   /// Maksymalna szerokość całej treści i formularzy/kreatora.
-  static const double maxTresc = 1200;
+  static const double maxTresc = 960;
   static const double maxFormularz = 640;
 
   static Uklad ukladDla(double szerokosc) {

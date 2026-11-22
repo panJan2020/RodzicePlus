@@ -13,7 +13,7 @@ class Kolory {
   static const ramka = Color(0xFFDADDDC);
   static const blad = Color(0xFFC8102E); // „nie przysługuje”
   static const bladTlo = Color(0xFFFDECEE);
-  static const ostrzezenie = Color(0xFFB35C00); // „brak danych”, do sprawdzenia
+  static const ostrzezenie = Color(0xFF9A4F00); // „brak danych”, do sprawdzenia
   static const ostrzezenieTlo = Color(0xFFFFF4E5);
   static const warunkowoTlo = Color(0xFFE8EEF5); // „warunkowo” (granat na jasnym tle), konflikt
 }

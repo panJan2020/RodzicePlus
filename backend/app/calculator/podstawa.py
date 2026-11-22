@@ -267,7 +267,7 @@ def _uwaga_minimum(u: UstaleniePodstawy, s: PodstawaPracownika, etat: Any) -> No
         u.pola.append("etat")
     if s.tryb == "proporcjonalnie":
         u.uwagi.append(
-            f"Podstawę podnieśliśmy do najniższej podstawy proporcjonalnej do wymiaru etatu ({etat}): "
+            f"Podstawę podnieśliśmy do najniższej podstawy proporcjonalnej do wymiaru etatu ({str(etat).replace('.', ',')}): "
             f"{kwota_tekst(s.kwota)} (art. 45 ustawy zasiłkowej). Ustawa mówi o „pracy w pełnym wymiarze czasu "
             "pracy”, a proporcja dla niepełnego etatu pochodzi z komentarzy – do potwierdzenia w ZUS. Bez "
             f"podniesienia podstawa wynosiłaby {kwota_tekst(s.alternatywa)} (wariant niepotwierdzony).")

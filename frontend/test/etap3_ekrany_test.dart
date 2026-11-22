@@ -11,6 +11,7 @@ import 'package:rodziceplus/features/logowanie/logowanie_viewmodel.dart';
 import 'package:rodziceplus/features/moje_swiadczenia/moje_swiadczenia_view.dart';
 import 'package:rodziceplus/features/moje_swiadczenia/moje_swiadczenia_viewmodel.dart';
 import 'package:rodziceplus/features/start/start_viewmodel.dart';
+import 'package:rodziceplus/shared/formatowanie.dart';
 
 import 'fake_serwer.dart';
 
@@ -85,6 +86,12 @@ class _FakeAuth extends AuthRepository {
 }
 
 void main() {
+  test('formaty: daty DD.MM.RRRR w tekście z dokumentu, miesiąc MM.RRRR, kwota 1 771,44 zł', () {
+    expect(ladnieDaty('za okres 2025-02-18 do 2025-05-27'), 'za okres 18.02.2025 do 27.05.2025');
+    expect(formatujMiesiac('2024-10'), '10.2024');
+    expect(formatujKwote('1771.44'), '1 771,44 zł');
+  });
+
   group('MojeSwiadczeniaViewModel', () {
     test('ładuje wyniki', () async {
       final repo = _FakeSprawy(SesjaAplikacji())..wyniki = [_wynik()];

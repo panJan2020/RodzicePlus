@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../data/models/modele.dart';
 import '../../data/models/plik_do_wgrania.dart';
+import '../../shared/formatowanie.dart';
 import '../../shared/widgets/przycisk_wstecz.dart';
 import '../../shared/widgets/stan_ladowania.dart';
 import '../../shared/widgets/tresc_strony.dart';
@@ -246,6 +247,10 @@ class _Wyniki extends StatelessWidget {
         const SizedBox(height: 12),
       ],
       for (final d in vm.dokumenty) ...[_KartaDokumentu(dokument: d), const SizedBox(height: 12)],
+      if (vm.pytanieOSytuacje != null) ...[
+        const SizedBox(height: 12),
+        _PytanieOSytuacje(pytanie: vm.pytanieOSytuacje!),
+      ],
       const SizedBox(height: 12),
       Semantics(header: true, child: Text('Odczytane dane', style: t.titleLarge)),
       const SizedBox(height: 4),
@@ -272,6 +277,52 @@ class _Wyniki extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+/// Jedno pytanie, którego nie da się odczytać z dokumentów: w jakiej jesteś sytuacji (np. w ciąży).
+class _PytanieOSytuacje extends StatelessWidget {
+  const _PytanieOSytuacje({required this.pytanie});
+  final PytanieDrzewa pytanie;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<DokumentyViewModel>();
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Kolory.warunkowoTlo,
+        borderRadius: BorderRadius.circular(8),
+        border: const Border(left: BorderSide(color: Kolory.secondary, width: 4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Semantics(header: true, child: Text('Jeszcze jedno pytanie', style: t.titleMedium)),
+        const SizedBox(height: 4),
+        Text('${pytanie.tresc} Tego nie widać w dokumentach, a bez tego nie ocenimy, jakie świadczenia Ci przysługują.',
+            style: t.bodyLarge),
+        const SizedBox(height: 12),
+        // Pełne wiersze zamiast „chipów”: długie odpowiedzi zawijają się, a cel dotyku ma ≥ 48 px.
+        for (final o in pytanie.opcje)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: Text(o.etykieta),
+            value: vm.wybraneSytuacje.contains(o.wartosc),
+            onChanged: vm.zapisujeSytuacje ? null : (_) => vm.przelaczSytuacje(o.wartosc),
+          ),
+        if (vm.bladSytuacji != null) ...[
+          const SizedBox(height: 8),
+          _Komunikat(tekst: vm.bladSytuacji!, ikona: Icons.error_outline, blad: true),
+        ],
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: vm.wybraneSytuacje.isEmpty || vm.zapisujeSytuacje ? null : vm.zapiszSytuacje,
+          icon: const Icon(Icons.check),
+          label: Text(vm.zapisujeSytuacje ? 'Zapisujemy…' : 'Zapisz i przelicz'),
+        ),
+      ]),
+    );
   }
 }
 
@@ -326,16 +377,19 @@ class _KartaDokumentu extends StatelessWidget {
                 if (d.archiwalny)
                   const Znacznik(kolor: Kolory.secondary, tlo: Kolory.warunkowoTlo, ikona: Icons.history,
                       napis: 'Formularz wycofany – nadal go czytamy'),
-                if (d.rola == 'dane')
+                if (d.rola == 'dane' && d.liczbaPol > 0)
                   Znacznik(kolor: Kolory.primary, tlo: Kolory.primaryLight, ikona: Icons.check_circle,
                       napis: '${d.liczbaPol} odczytanych pól'),
+                if (d.rola == 'dane' && d.liczbaPol == 0)
+                  const Znacznik(kolor: Kolory.tekstDrugorzedny, tlo: Kolory.tlo, ikona: Icons.remove_circle_outline,
+                      napis: 'Nie odczytano pól'),
                 if (d.doSprawdzenia > 0)
                   Znacznik(kolor: Kolory.ostrzezenie, tlo: Kolory.ostrzezenieTlo, ikona: Icons.warning_amber,
                       napis: '${d.doSprawdzenia} do sprawdzenia'),
               ]),
               if (d.informacja.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                for (final i in d.informacja) Text('• $i', style: t.bodyMedium),
+                for (final i in d.informacja) Text('• ${ladnieDaty(i)}', style: t.bodyMedium),
               ],
             ]),
           ),
@@ -430,6 +484,8 @@ class _KartaPorownania extends StatelessWidget {
           'Nie możemy jeszcze porównać wyniku z decyzją ZUS – brakuje danych albo wynik jest warunkowy.'),
     };
     final wynik = p.wynikAplikacji;
+    final uwagaJakoZdanie = p.zgodnosc == Zgodnosc.nieDoPorownania && p.uwagi.isNotEmpty; // backend tłumaczy dokładniej
+    final zdanieOstateczne = uwagaJakoZdanie ? p.uwagi.first : zdanie;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -439,14 +495,14 @@ class _KartaPorownania extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Znacznik(kolor: kolor, tlo: tlo, ikona: ikona, napis: napis),
           const SizedBox(height: 12),
-          Text(zdanie, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+          Text(zdanieOstateczne, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          Text('Decyzja ZUS: ${p.decyzjaZus.tekst}', style: t.bodyMedium),
+          Text('Decyzja ZUS: ${ladnieDaty(p.decyzjaZus.tekst)}', style: t.bodyMedium),
           if (wynik != null) ...[
             const SizedBox(height: 4),
             Text('Wynik aplikacji: ${wygladStatusu(wynik.status).$4}', style: t.bodyMedium),
           ],
-          for (final u in p.uwagi) ...[const SizedBox(height: 4), Text('• $u', style: t.bodyMedium)],
+          for (final u in p.uwagi.skip(uwagaJakoZdanie ? 1 : 0)) ...[const SizedBox(height: 4), Text('• $u', style: t.bodyMedium)],
         ]),
       ),
     );

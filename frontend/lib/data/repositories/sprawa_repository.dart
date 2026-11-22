@@ -142,6 +142,13 @@ class SprawaRepository {
         }
       });
 
+  /// Pytanie A1 „Jaka jest Twoja sytuacja?”, jeśli wnioskodawca jeszcze na nie nie odpowiedział (z dokumentów
+  /// tego nie wiemy – zwolnienie lekarskie nie mówi, czy to ciąża). Bez niego reguły nie mają od czego zacząć.
+  Future<PytanieDrzewa?> pytanieOSytuacje() async {
+    final p = (await dane()).pytanie('A1');
+    return (p == null || p.odpowiedziane) ? null : p;
+  }
+
   /// Wartości odczytane z dokumentów (`kanal: "upload"`) dla wszystkich osób sprawy.
   /// Wartość-część (z której powstała wartość scalona) pomijamy, żeby nie dublować okresów.
   Future<List<OdczytanePole>> odczytanePola() async {
@@ -152,7 +159,7 @@ class SprawaRepository {
       for (final sekcja in d.sekcje) {
         for (final p in sekcja.pytania) {
           for (final w in p.wartosci) {
-            if (w.kanal != 'upload' || w.czescZ != null) continue;
+            if (w.kanal != 'upload' || w.czescZ != null || !w.aktywna) continue; // tylko to, czego używamy (duplikaty z kolejnych stron Z-3 pomijamy)
             wynik.add(OdczytanePole(osoba: d.osoba, pytanie: p, wartosc: w, opis: opisWartosciPola(p, w.wartosc)));
           }
         }

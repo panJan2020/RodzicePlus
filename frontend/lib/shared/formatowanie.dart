@@ -46,6 +46,26 @@ String formatujLiczbe(Object n) {
   return (v == v.roundToDouble() ? v.round().toString() : v.toString()).replaceAll('.', ',');
 }
 
+/// Tytuły ubezpieczenia (kody z backendu) po polsku – do list okresów.
+const _tytulyUbezpieczenia = {
+  'umowa_o_prace': 'Umowa o pracę',
+  'zlecenie': 'Umowa zlecenia',
+  'dzialalnosc': 'Działalność gospodarcza',
+  'wspolpraca': 'Współpraca przy działalności',
+  'dzielo': 'Umowa o dzieło',
+  'inne': 'Inny tytuł',
+};
+
+/// W tekście z dokumentu zamienia daty `2025-02-18` na `18.02.2025`.
+String ladnieDaty(String tekst) => tekst.replaceAllMapped(
+    RegExp(r'(\d{4})-(\d{2})-(\d{2})'), (m) => '${m[3]}.${m[2]}.${m[1]}');
+
+/// `2024-10` → `10.2024` (miesiąc rozliczeniowy).
+String formatujMiesiac(String rrrrMm) {
+  final c = rrrrMm.split('-');
+  return c.length == 2 ? '${c[1]}.${c[0]}' : rrrrMm;
+}
+
 /// Jedna odpowiedź (bez pól „na tytuł”) zamieniona na tekst dla człowieka.
 String _opisJednej(PytanieDrzewa p, Object? w) {
   String etykieta(Object? v) =>
@@ -69,7 +89,9 @@ String _opisJednej(PytanieDrzewa p, Object? w) {
         if (e is! Map) return '$e';
         final koniec = e['do'] == null ? 'nadal' : formatujDateIso('${e['do']}');
         final zakres = '${formatujDateIso('${e['od']}')} – $koniec';
-        if (e['platnik'] != null) return '${e['platnik']}: $zakres';
+        if ('${e['platnik'] ?? ''}'.isNotEmpty) return '${e['platnik']}: $zakres';
+        final tytul = _tytulyUbezpieczenia['${e['tytul']}'];
+        if (tytul != null) return '$tytul: $zakres';
         final kod = e['kod'] == null ? '' : ' (kod ${e['kod']})';
         return '$zakres$kod';
       }).join('\n');
@@ -82,7 +104,7 @@ String _opisJednej(PytanieDrzewa p, Object? w) {
             ? formatujKwote(e['skladniki_stale'] ?? '0')
             : '${formatujKwote(e['skladniki_stale'] ?? '0')} + ${formatujKwote(e['skladniki_zmienne'])}';
         final dni = (e['dni_obowiazujace'] ?? 0) == 0 ? '' : ' (${e['dni_przepracowane']} z ${e['dni_obowiazujace']} dni)';
-        return '${e['miesiac']}: $kwota$dni';
+        return '${formatujMiesiac('${e['miesiac']}')}: $kwota$dni';
       }).join('\n');
     case TypPytania.zasilek:
       if (w is! Map) return 'Brak';

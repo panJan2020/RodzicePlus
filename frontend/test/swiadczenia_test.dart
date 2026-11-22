@@ -21,7 +21,7 @@ void main() {
       expect(find.text('10.03.2027 – 27.07.2027 (20 tyg.)'), findsOneWidget);
       expect(find.text('Ubezpieczenie chorobowe w dniu porodu'), findsOneWidget);
       expect(find.textContaining('złóż w kadrach'), findsOneWidget);
-      expect(find.text('Wynagrodzenie w kolejnych miesiącach (O4)'), findsOneWidget); // do potwierdzenia
+      expect(find.text('Wynagrodzenie w kolejnych miesiącach'), findsOneWidget); // do potwierdzenia
       expect(find.text('Brakuje danych'), findsOneWidget);
       expect(tester.takeException(), isNull); // bez przepełnień układu
     });

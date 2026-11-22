@@ -62,7 +62,7 @@ void main() {
 
     await tester.ensureVisible(find.text('Brakuje danych'));
     expect(find.text('Brakuje danych'), findsOneWidget);
-    expect(find.text('Na jakiej podstawie pracujesz? (B1)'), findsOneWidget);
+    expect(find.text('Na jakiej podstawie pracujesz?'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Uzupełnij'));
     await tester.tap(find.text('Uzupełnij'));

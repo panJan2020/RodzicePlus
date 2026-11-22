@@ -1,8 +1,10 @@
 """Punkt wejścia REST API. Uruchomienie: uvicorn app.main:app --reload (w katalogu backend/)."""
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import config
 from app.api import admin, auth, dokumenty, info, sprawy, swiadczenia, zadania, zrodla
@@ -34,3 +36,10 @@ for r in (auth.router, sprawy.router, dokumenty.router, zrodla.router, swiadczen
 def health() -> dict:
     """Do 'budzenia' darmowego hostingu przed prezentacją i do monitoringu."""
     return {"status": "ok"}
+
+
+# Zbudowany frontend (flutter build web → backend/static/): aplikacja i API pod jednym adresem, więc frontend
+# używa względnego adresu API. Montowane na końcu, żeby nie zasłaniać tras API. Bez katalogu – tylko API.
+_STATIC = Path(__file__).resolve().parent.parent / "static"
+if _STATIC.is_dir():
+    app.mount("/", StaticFiles(directory=_STATIC, html=True), name="frontend")

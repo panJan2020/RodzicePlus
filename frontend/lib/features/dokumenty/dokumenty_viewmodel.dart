@@ -40,6 +40,12 @@ class DokumentyViewModel extends ChangeNotifier {
   List<OdczytanePole> odczytane = [];
   Porownanie? porownanie;
 
+  /// Pytanie „Jaka jest Twoja sytuacja?”, dopóki użytkownik na nie nie odpowie (null – odpowiedziano).
+  PytanieDrzewa? pytanieOSytuacje;
+  final Set<Object?> wybraneSytuacje = {};
+  bool zapisujeSytuacje = false;
+  String? bladSytuacji;
+
   // --- usuwanie ---
   String? usuwanyId;
   String? bladUsuwania;
@@ -137,10 +143,34 @@ class DokumentyViewModel extends ChangeNotifier {
       dokumenty = await _sprawy.dokumenty();
       odczytane = await _sprawy.odczytanePola();
       porownanie = await _sprawy.porownanie();
+      pytanieOSytuacje = dokumenty.isEmpty ? null : await _sprawy.pytanieOSytuacje();
     } on ApiException catch (e) {
       blad = e.komunikat;
     } finally {
       laduje = false;
+      if (!_zniszczony) notifyListeners();
+    }
+  }
+
+  void przelaczSytuacje(Object? wartosc) {
+    if (!wybraneSytuacje.remove(wartosc)) wybraneSytuacje.add(wartosc);
+    notifyListeners();
+  }
+
+  /// Zapisuje odpowiedź na A1 i przelicza wyniki (odświeża też porównanie z decyzją ZUS).
+  Future<void> zapiszSytuacje() async {
+    if (wybraneSytuacje.isEmpty || zapisujeSytuacje) return;
+    zapisujeSytuacje = true;
+    bladSytuacji = null;
+    notifyListeners();
+    try {
+      await _sprawy.zapiszOdpowiedz('sytuacja', wybraneSytuacje.toList());
+      wybraneSytuacje.clear();
+      await zaladuj();
+    } on ApiException catch (e) {
+      bladSytuacji = e.komunikat;
+    } finally {
+      zapisujeSytuacje = false;
       if (!_zniszczony) notifyListeners();
     }
   }

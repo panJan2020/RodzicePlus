@@ -67,6 +67,20 @@ class _FakeRepo extends SprawaRepository {
   @override
   Future<Porownanie?> porownanie() async => null;
 
+  PytanieDrzewa? sytuacja;
+  Object? zapisanaSytuacja;
+
+  @override
+  Future<PytanieDrzewa?> pytanieOSytuacje() async => sytuacja;
+
+  @override
+  Future<ZmianaDanych> zapiszOdpowiedz(String pole, Object? wartosc, {String? osoba}) async {
+    zapisanaSytuacja = wartosc;
+    sytuacja = null; // odpowiedziano
+    return const ZmianaDanych(
+        dodano: 1, zmienionoAktywne: [], noweKonflikty: 0, liczniki: _liczniki, wynikiNieaktualne: true);
+  }
+
   @override
   Future<ZmianaDanych> usunDokument(String dokumentId) async {
     zapisane = [];
@@ -148,6 +162,27 @@ void main() {
     await vm.usun(_z3);
     expect(vm.dokumenty, isEmpty);
     expect(vm.usuwanyId, isNull);
+  });
+
+  test('pytanie o sytuację: wybór, zapis odpowiedzi i zniknięcie pytania po przeliczeniu', () async {
+    final repo = _FakeRepo()
+      ..zapisane = [_z3]
+      ..sytuacja = const PytanieDrzewa(
+        id: 'A1', sekcja: 'A', pole: 'sytuacja', tresc: 'Jaka jest Twoja sytuacja?', typ: TypPytania.wielokrotny,
+        status: StatusPytania.aktywne, opcje: [OpcjaPytania(wartosc: 'ciaza', etykieta: 'Jestem w ciąży')],
+      );
+    final vm = _vm(repo);
+    await Future<void>.delayed(Duration.zero);
+    expect(vm.pytanieOSytuacje, isNotNull);
+
+    await vm.zapiszSytuacje(); // nic nie wybrano – nic się nie dzieje
+    expect(repo.zapisanaSytuacja, isNull);
+
+    vm.przelaczSytuacje('ciaza');
+    await vm.zapiszSytuacje();
+    expect(repo.zapisanaSytuacja, ['ciaza']);
+    expect(vm.pytanieOSytuacje, isNull);
+    expect(vm.wybraneSytuacje, isEmpty);
   });
 
   group('ApiClient – własne wyjątki', () {

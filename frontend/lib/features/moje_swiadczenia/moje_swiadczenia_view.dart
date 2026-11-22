@@ -387,7 +387,7 @@ class _Pytanie extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${pole.tresc} (${pole.pytanieId})', style: t.bodyLarge),
+        Text(pole.tresc, style: t.bodyLarge),
         if (pole.gdzieZnalezc != null) Text('Znajdziesz to: ${pole.gdzieZnalezc}', style: t.bodyMedium),
       ]),
     );

@@ -210,7 +210,7 @@ Aplikacja ma wyglądać dobrze **na telefonie (od 360 px) i na komputerze (do 19
   Nie wpisuj liczb szerokości w widokach.
 - **Nawigacja:** telefon → dolny `NavigationBar` z 5 pozycjami (Start, Moje dane, Świadczenia, Kalkulator, Więcej);
   pozostałe ekrany w „Więcej”. Tablet/komputer → boczny `NavigationRail` (rozwinięty na komputerze) ze wszystkimi pozycjami.
-- **Szerokość treści:** całość max 1200 px, wyśrodkowana; formularze i kreator max 640 px.
+- **Szerokość treści:** całość max 960 px, wyśrodkowana; formularze i kreator max 640 px.
 - **Siatki kafelków:** `LayoutBuilder` → 1 kolumna (telefon), 2 (tablet), 3 (komputer).
 - **Kalkulator i wyniki:** komputer → dwie kolumny (świadczenia | okresy i kwoty); telefon → jedna pod drugą.
   Porównanie scenariuszy: komputer → kolumny obok siebie; telefon → zakładki.
@@ -238,7 +238,7 @@ Wartości startowe **inspirowane zus.pl**. Zweryfikuj je pipetą (DevTools → I
 | Powierzchnia | `#FFFFFF` | karty, formularze |
 | Tekst | `#1A1A1A` / drugorzędny `#4A4A4A` | |
 | `nie_przysluguje` / błąd | `#C8102E` | |
-| `brak_danych` / ostrzeżenie | `#B35C00` na tle `#FFF4E5` | braki, ryzyka, wartości do sprawdzenia |
+| `brak_danych` / ostrzeżenie | `#9A4F00` na tle `#FFF4E5` (kontrast 5,5:1; pierwotne `#B35C00` dawało 4,3:1) | braki, ryzyka, wartości do sprawdzenia |
 | `warunkowo` / konflikt | granat `#1B365D` na tle `#E8EEF5` | wynik zależny od przyszłego zdarzenia, pole z konfliktem |
 | `przysluguje` / sukces | primary `#00843D` | |
 Kontrast tekstu min. **4.5:1** (WCAG AA). Status nigdy tylko kolorem: zawsze też ikona i tekst.
@@ -411,6 +411,24 @@ Mapowanie na wymagania ZUS: `docs/opis_aplikacji.md`, rozdział 14.
   do pracy w ciąży; w innym razie świadczenie jest w katalogu „Co jeszcze może Ci przysługiwać”, a nie jako karta z brakiem
   danych. Zdecyduj, czy filtruje backend (pole `dotyczy` w wyniku), czy widok.
 - **Gotowe, gdy:** jury może wgrać PDF i zobaczyć wynik na telefonie i komputerze.
+- [x] Etap 3 zrobiony _(22.11.2026)_: przejście w prawdziwej przeglądarce (Chrome, 375 i 1440 px, bez poziomego przewijania) dla
+  obu spraw ZUS; zrzuty w `docs/screenshots/`. Anna: zasiłek chorobowy od 23.03.2025, 1 771,44 zł brutto (orientacyjnie),
+  „zgodne z decyzją ZUS”. Działalność: „brak danych” z prośbą o wgranie zwolnienia (nie do porównania z decyzją ZUS).
+  Po odczycie dokumentów ekran pyta raz o sytuację (A1 – czy ciąża), bo tego nie widać w dokumentach.
+
+### Znane błędy i ograniczenia (stan po etapie 3)
+- **Sprawa dzialalnosc_chorobowy_ciaza:** wynik „brak danych” – w PDF nie ma zwolnienia (e-ZLA), a Z-3b, zrzut systemu i dwie strony
+  „inne” dają 0 odczytanych pól. Decyzja ZUS to „przyznano”, więc porównanie = „nie do porównania”. Działalność (art. 48a) bez kwoty.
+- **Karty macierzyńskie przy sprawie chorobowej:** pytają o przewidywaną datę porodu (i zadłużenie przy działalności) – prawdziwe braki,
+  ale mogą mylić jury; są na dole listy, pod wynikami ustalonymi.
+- **Konflikt `ezla` ZAS-53 vs Z-3** (etap 5): „Moje dane” pokażą go jako konflikt, choć okresy się nie wykluczają.
+- **Niepełne `Odczytane dane`:** pokazujemy tylko aktywne wartości (bez duplikatów z kolejnych Z-3); pozostałe są w „Moje dane”.
+- **Logowanie po wgraniu dokumentów:** zalogowanie zakłada nową sprawę, więc dokumenty wgrane anonimowo znikają.
+- **Przeglądarki mobilne:** wybór pliku i wynik sprawdzone w emulacji Chrome (viewport + dotyk); nie testowano na prawdziwym iOS
+  Safari i Android Chrome – do sprawdzenia ręcznie przed prezentacją.
+- **Ikony „Material” w buildzie release:** `flutter build web --release` bez wcześniejszego `rm -rf build/web` potrafi zostawić
+  pusty katalog `assets/fonts` i brak `favicon.png` (ikony jako kwadraty). Zawsze buduj na czysto.
+- Teksty ostrzeżeń z backendu (np. art. 45) są długie i szczegółowe – do skrócenia dla użytkownika.
 
 ### Etap 4 – Kalkulator zintegrowany
 - [ ] Oboje rodzice, scenariusze i ich porównanie, oś czasu z powrotem do pracy, łączenie pracy z urlopem
@@ -469,7 +487,8 @@ pytest
 cd frontend
 flutter pub get
 flutter run -d chrome --dart-define=API_URL=http://localhost:8000
-flutter build web --release --dart-define=API_URL=https://<backend>
+rm -rf build/web && flutter build web --release   # adres API względny; osobny host: --dart-define=API_URL=https://<backend>
+cp -r build/web ../backend/static                     # backend serwuje frontend z backend/static (katalog w .gitignore)
 ```
 
 Wdrożenie demo: backend → Render/Railway (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`);
